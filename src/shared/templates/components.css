@@ -1,0 +1,140 @@
+/* Interview-specific layout and component styles */
+
+/* Timer display */
+.timer-display {
+    text-align: center; margin-bottom: 1.5rem;
+}
+
+.timer-value {
+    font-size: 3rem; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(to right, var(--cyan), var(--accent));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    letter-spacing: 2px;
+}
+
+.timer-label {
+    font-size: 0.8rem; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: 1.5px; margin-top: 0.25rem;
+}
+
+.timer-value.warning { 
+    background: linear-gradient(to right, var(--warning), var(--danger));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+
+/* Interview grid layout */
+.interview-grid {
+    display: grid; grid-template-columns: 2fr 1fr; gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+    .interview-grid { grid-template-columns: 1fr; }
+}
+
+.side-widgets { display: flex; flex-direction: column; gap: 1rem; }
+
+.widget-title {
+    font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 1.5px; color: var(--text-muted);
+    font-weight: 600; margin-bottom: 0.75rem;
+}
+
+/* Status rows */
+.status-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid var(--border-subtle);
+}
+
+.status-row:last-child { border-bottom: none; }
+.status-label { font-size: 0.85rem; color: var(--text-secondary); }
+.status-val { font-size: 0.85rem; font-weight: 600; }
+.status-val.ok { color: var(--success); }
+.status-val.warn { color: var(--warning); }
+.status-val.danger { color: var(--danger); }
+
+/* Attempt badge */
+.attempt-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.35rem 0.85rem;
+    background: var(--accent-glow);
+    border: 1px solid var(--accent);
+    border-radius: 20px;
+    font-size: 0.78rem; font-weight: 600;
+    color: var(--accent);
+}
+
+/* Post-interview */
+.result-icon {
+    font-size: 4rem; text-align: center; margin-bottom: 1rem;
+}
+
+.violations-list {
+    display: flex; flex-direction: column; gap: 0.75rem;
+    margin-top: 1rem; max-height: 400px; overflow-y: auto;
+}
+
+.violation-card {
+    display: flex; align-items: flex-start; gap: 1rem;
+    padding: 1rem;
+    background: var(--bg-secondary);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--danger);
+}
+
+.violation-number {
+    width: 28px; height: 28px; min-width: 28px;
+    border-radius: 50%;
+    background: var(--danger-glow);
+    color: var(--danger);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.8rem; font-weight: 700;
+}
+
+.violation-body { flex: 1; }
+
+.violation-type {
+    font-size: 0.85rem; font-weight: 600;
+    color: var(--text-primary); margin-bottom: 0.25rem;
+}
+
+.violation-time {
+    font-size: 0.75rem; color: var(--text-muted);
+}
+
+.violation-detail {
+    font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.3rem;
+}
+
+.clean-result {
+    text-align: center; padding: 2rem;
+    color: var(--success);
+}
+
+.clean-result .result-emoji { font-size: 3rem; margin-bottom: 0.75rem; }
+.clean-result p { font-size: 1.1rem; font-weight: 600; }
+
+/* Action buttons row */
+.actions-row {
+    display: flex; justify-content: center; gap: 1rem;
+    margin-top: 1.5rem; flex-wrap: wrap;
+}
+
+/* Scrollbar */
+.violations-list::-webkit-scrollbar { width: 4px; }
+.violations-list::-webkit-scrollbar-track { background: transparent; }
+.violations-list::-webkit-scrollbar-thumb {
+    background: var(--border-subtle); border-radius: 2px;
+}
+
+/* Fade animation for violations */
+.violation-card {
+    animation: slideUp 0.3s ease forwards;
+    opacity: 0;
+}
+
+@keyframes slideUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}

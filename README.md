@@ -36,14 +36,19 @@ src/
 | FR2 | Analyze gaze using MediaPipe Face Landmarker |
 | FR3 | Detect "Looking Away" based on iris-to-corner geometric distance (< 0.02 or > 0.06) |
 | FR4 | Check video brightness; classify as "Good" (>40) or "Too Dark" (<=40) |
-| FR5 | Enforce 4-strike rules: warn on 1-3, terminate on 4 |
+| FR5 | Enforce 4-strike rules silently; terminate session on 4th strike |
 | FR6 | Log telemetry to MongoDB asynchronously |
 | FR7 | Log strike events to MongoDB |
 | FR8 | Track strike counts in Redis with 2-hour TTL |
-| FR9 | Serve a dashboard HTML page for each candidate |
-| FR10 | On termination, stop camera, close WebSocket, close browser window |
-| FR11 | Check audio volume client-side; warn if between 2-15 |
+| FR9 | 3-phase UI: Preview → Active Interview → Post-Interview Report |
+| FR10 | On termination, stop camera, close WebSocket, show post-interview screen |
+| FR11 | Check audio volume client-side with visual meter |
 | FR12 | Auto-download MediaPipe model if missing |
+| FR13 | Pre-interview camera/mic preview with environment quality checks |
+| FR14 | Configurable interview duration via `INTERVIEW_DURATION_MINUTES` env var |
+| FR15 | Attempt-based recording: `TOTAL_USER_ATTEMPT` controls max interview attempts |
+| FR16 | Post-interview violations report via `GET /interview/{id}/violations` |
+| FR17 | Dark/light theme toggle with localStorage persistence |
 
 ## Non-Functional Requirements
 
@@ -77,9 +82,31 @@ src/
 
 ### `GET /interview/{candidate_id}`
 
-Serves the interactive interview dashboard HTML page.
+Serves the 3-phase interactive interview dashboard with Jinja2-injected configuration.
 
-**Response:** `text/html` — the interview console with webcam feed, strike tracker, and indicators.
+**Response:** `text/html` — 3-phase console: Preview → Active Interview → Post-Interview Report.
+
+### `GET /interview/{candidate_id}/violations`
+
+Returns aggregated violations detected during the candidate's interview session.
+
+**Response:**
+```json
+{
+  "candidate_id": "candidate_123",
+  "total_violations": 2,
+  "total_strikes": 2,
+  "events": [
+    {
+      "timestamp": "2026-06-20T10:00:00+00:00",
+      "violation_type": "Looking Away",
+      "details": { "strike_count": 1, "cause": { "gaze_metric": 0.01 } },
+      "strike_number": 1
+    }
+  ],
+  "attempt_number": 1
+}
+```
 
 ### `WebSocket /ws/interview/{candidate_id}`
 
@@ -179,6 +206,8 @@ Set environment variables in `.env`:
 | `JWT_SECRET` | — | JWT signing secret |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm |
 | `SECURE_COOKIE` | `False` | Secure cookie flag |
+| `INTERVIEW_DURATION_MINUTES` | `30` | Interview session length in minutes |
+| `TOTAL_USER_ATTEMPT` | `1` | Max interview attempts per candidate |
 | `LLM_PROVIDER` | `groq` | LLM provider (reserved) |
 | `LLM_MODEL` | `llama-3.1-8b-instant` | LLM model (reserved) |
 | `GROQ_API_KEY` | `None` | Groq API key for STT |

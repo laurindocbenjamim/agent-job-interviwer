@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     secure_cookie: bool = Field(False, alias="SECURE_COOKIE")
 
+    # Interview configuration
+    interview_duration_minutes: int = Field(30, alias="INTERVIEW_DURATION_MINUTES")
+    total_user_attempt: int = Field(1, alias="TOTAL_USER_ATTEMPT")
+
     # Provider and STT config (if needed)
     llm_provider: Optional[str] = Field("groq", alias="LLM_PROVIDER")
     llm_model: Optional[str] = Field("llama-3.1-8b-instant", alias="LLM_MODEL")

@@ -15,7 +15,6 @@ pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
 httpx>=0.24.1
-TTS>=0.22.0
 pydub>=0.25.1
 groq>=0.5.0
 python-multipart>=0.0.9

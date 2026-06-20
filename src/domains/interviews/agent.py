@@ -9,28 +9,34 @@ from src.config.settings import settings
 # For production, move this to Redis.
 _sessions: Dict[str, List[Dict[str, str]]] = {}
 
-PROMPT = """You are an expert AI Job Interviewer. Your objective is to conduct a professional, friendly, and rigorous interview. 
+def get_dynamic_prompt() -> str:
+    topics_list = [t.strip() for t in settings.interview_topics.split(",")]
+    topics_str = "\n".join([f"{i+1}. {topic}" for i, topic in enumerate(topics_list)])
+    
+    return f"""You are an expert AI Job Interviewer. Your objective is to {settings.interview_objective}.
 
 You must evaluate the candidate on the following REQUIRED TOPICS:
-1. Experience with FastAPI and Async Python.
-2. System design concepts (Caching with Redis, Databases with MongoDB).
-3. Handling real-time streaming data pipelines.
+{topics_str}
 
 CRITICAL INSTRUCTIONS:
-- Be conversational. Do not just jump from topic to topic. Acknowledge their previous answer naturally before moving on or asking a follow-up question.
-- Ask only ONE question at a time. Keep questions concise and optimized for spoken audio.
-- Never step out of character. Do not give feedback like "Great answer!" unless a real human recruiter would say it.
-- Track which topics have been fully covered. Once all topics are completed, politely wrap up the interview.
+- Be conversational. Acknowledge their previous answer naturally before moving on or asking a follow-up question.
+- Ask exactly ONE question at a time.
+- You can ask different types of questions. Set `input_type` to one of: "voice" (for spoken answers), "text" (for written answers), "multiple_choice" (for radio buttons), or "checkbox" (for multi-select).
+- If `input_type` is "multiple_choice" or "checkbox", you MUST provide an array of strings in the `options` field. Otherwise, leave it empty.
+- You must end the interview after exactly {settings.num_questions} questions have been asked in total.
+- Keep track of which topics have been fully covered. Once {settings.num_questions} questions are asked or all topics are completed, politely wrap up the interview and set "interview_complete": true.
 
 OUTPUT FORMAT:
 You must ALWAYS respond in a strict JSON format. Do not include any conversational text outside the JSON block. Use the following schema:
 
-{
+{{
   "text_to_speak": "The exact question or response the candidate will hear and read on screen.",
-  "current_topic": "The topic currently being evaluated (e.g., 'FastAPI and Async Python')",
+  "current_topic": "The topic currently being evaluated",
+  "input_type": "voice",
+  "options": [],
   "topics_completed": ["List", "of", "completed", "topics"],
   "interview_complete": false
-}"""
+}}"""
 
 async def transcribe_audio(audio_bytes: bytes) -> str:
     """Uses Groq Whisper to transcribe PCM audio bytes."""
@@ -67,7 +73,7 @@ async def generate_agent_response(candidate_id: str, candidate_text: str) -> dic
         
     if candidate_id not in _sessions:
         _sessions[candidate_id] = [
-            {"role": "system", "content": PROMPT}
+            {"role": "system", "content": get_dynamic_prompt()}
         ]
         
     if candidate_text:

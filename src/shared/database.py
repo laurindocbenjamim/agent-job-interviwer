@@ -24,3 +24,13 @@ async def get_violation_events(candidate_id: str) -> list:
         {"_id": 0}
     ).sort("timestamp", 1)
     return await cursor.to_list(length=500)
+
+async def save_interview_session(candidate_id: str, session_data: list) -> None:
+    """Saves the final interview transcript session to MongoDB."""
+    document = {
+        "candidate_id": candidate_id,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc),
+        "event_type": "interview_finalized",
+        "transcript": session_data
+    }
+    await logs_collection.insert_one(document)

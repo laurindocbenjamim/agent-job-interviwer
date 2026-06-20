@@ -30,6 +30,8 @@ async def serve_interview_console(candidate_id: str):
     rendered = template.render(
         interview_duration_minutes=settings.interview_duration_minutes,
         total_user_attempt=settings.total_user_attempt,
+        avatar_gender=settings.avatar_gender.lower(),
+        agent_speech_speed=settings.agent_speech_speed,
     )
     return HTMLResponse(content=rendered)
 
@@ -56,12 +58,57 @@ async def get_violations_report(candidate_id: str):
     )
     return report.model_dump()
 
+@router.websocket("/ws/interview/{candidate_id}")
+async def interview_stream(websocket: WebSocket, candidate_id: str):
+    """WebSocket stream for camera frames and compliance verification."""
+    await websocket.accept()
+
+    try:
+        while True:
+            try:
+                data = await websocket.receive_text()
+                payload = json.loads(data)
+
+                if "image" not in payload:
+                    continue
+
+                try:
+                    base64_data = payload["image"].split(",")[1]
+                    image_bytes = base64.b64decode(base64_data)
+                    np_array = np.frombuffer(image_bytes, dtype=np.uint8)
+                    frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
+                except Exception as e:
+                    print(f"[WS DEBUG] Base64 decode failed for {candidate_id}: {e}")
+                    continue
+
+                if frame is None:
+                    continue
+
+                is_violation, details, video_quality = await asyncio.to_thread(analyze_frame, frame)
+
+                response_data = await evaluate_candidate_frame(
+                    candidate_id=candidate_id,
+                    is_violation=is_violation,
+                    details=details,
+                    video_quality=video_quality,
+                )
+
+                await websocket.send_json(response_data)
+            except Exception as inner_e:
+                print(f"[WS DEBUG] Inner loop error for {candidate_id}: {inner_e}")
+
+    except WebSocketDisconnect:
+        await log_activity(candidate_id, "session_disconnected", {"status": "closed"})
+    except Exception as outer_e:
+        print(f"[WS DEBUG] Outer loop error for {candidate_id}: {outer_e}")
+
 from pydantic import BaseModel
 from aiortc import RTCPeerConnection, RTCSessionDescription
 from src.domains.interviews.webrtc import InterviewVideoStreamTrack, InterviewAudioStreamTrack, TTSAudioStreamTrack
 
 # Store peer connections to prevent garbage collection and allow cleanup
 peer_connections = set()
+active_sessions = {}
 
 class OfferRequest(BaseModel):
     sdp: str
@@ -78,12 +125,20 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
     tts_track = TTSAudioStreamTrack()
     pc.addTrack(tts_track)
 
+    channel_ref = {"channel": None}
+    active_sessions[candidate_id] = {"tts_track": tts_track, "channel_ref": channel_ref}
+
+    @pc.on("datachannel")
+    def on_datachannel(channel):
+        channel_ref["channel"] = channel
+
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"Connection state is {pc.connectionState}")
         if pc.connectionState == "failed" or pc.connectionState == "closed":
             await pc.close()
             peer_connections.discard(pc)
+            active_sessions.pop(candidate_id, None)
             await log_activity(candidate_id, "session_disconnected", {"status": pc.connectionState})
 
     @pc.on("track")
@@ -99,7 +154,7 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
                 
         elif track.kind == "audio":
             # Wrap the incoming audio track
-            local_audio = InterviewAudioStreamTrack(track, candidate_id, tts_track)
+            local_audio = InterviewAudioStreamTrack(track, candidate_id, tts_track, channel_ref)
             pc.addTrack(local_audio)
 
     # Handle offer and create answer
@@ -108,3 +163,46 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
     await pc.setLocalDescription(answer)
 
     return {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
+
+from src.domains.interviews.agent import _sessions, generate_agent_response
+from src.shared.database import save_interview_session
+from src.domains.interviews.tts import generate_speech
+import json
+
+class SubmitRequest(BaseModel):
+    answer: str = ""
+
+@router.post("/interview/{candidate_id}/submit")
+async def force_submit_answer(candidate_id: str, request: SubmitRequest):
+    """Forces the LLM to generate the next question based on current history and user's answer."""
+    response = await generate_agent_response(candidate_id, request.answer)
+    
+    session = active_sessions.get(candidate_id)
+    if session:
+        # Send JSON via DataChannel
+        channel = session["channel_ref"].get("channel")
+        if channel and channel.readyState == "open":
+            try:
+                channel.send(json.dumps(response))
+            except Exception as e:
+                print(f"Error sending datachannel message: {e}")
+                
+        # Send Audio via TTS track
+        text_to_speak = response.get("text_to_speak", "")
+        if text_to_speak:
+            pcm_bytes = await generate_speech(text_to_speak)
+            await session["tts_track"].add_audio(pcm_bytes)
+            
+    return response
+
+@router.post("/interview/{candidate_id}/finalize")
+async def finalize_interview(candidate_id: str):
+    """Saves the interview data to MongoDB and cleans up the session."""
+    session_data = _sessions.get(candidate_id, [])
+    await save_interview_session(candidate_id, session_data)
+    
+    # Clean up memory
+    if candidate_id in _sessions:
+        del _sessions[candidate_id]
+        
+    return {"status": "success", "message": "Interview finalized and saved to MongoDB"}

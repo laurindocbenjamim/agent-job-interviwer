@@ -1,119 +1,174 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Video, VideoOff, AlertCircle, Mic, CheckCircle } from 'lucide-react';
+import { Video, VideoOff, Mic, Clock, Send, Save } from 'lucide-react';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, Environment } from '@react-three/drei';
+import { AgentAvatar } from './components/AgentAvatar';
 import './InterviewPage.css';
 
-const mockData = [
-  { time: '0:00', stress: 10, engagement: 90 },
-  { time: '5:00', stress: 20, engagement: 85 },
-  { time: '10:00', stress: 40, engagement: 60 },
-  { time: '15:00', stress: 15, engagement: 95 },
-];
-
-const TOPICS = [
-  "Experience with FastAPI and Async Python.",
-  "System design concepts (Caching with Redis, Databases with MongoDB).",
-  "Handling real-time streaming data pipelines."
-];
+const QUESTION_TIME_LIMIT = 120; // Seconds
 
 export const InterviewPage: React.FC = () => {
   const { candidateId } = useParams<{ candidateId: string }>();
-  const { localVideoRef, isStarted, status, startInterview, stopInterview } = useWebRTC(candidateId || 'default');
+  const { 
+    localVideoRef, 
+    isStarted, 
+    status, 
+    agentMessage,
+    startInterview, 
+    submitAnswer,
+    finalizeSession
+  } = useWebRTC(candidateId || 'default');
+
+  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT);
+  const [isAnswering, setIsAnswering] = useState(false);
+
+  // Timer logic
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (isStarted && isAnswering && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && isAnswering) {
+      handleSubmit();
+    }
+    return () => clearInterval(timer);
+  }, [isStarted, isAnswering, timeLeft]);
+
+  // When a new question arrives, start the timer
+  useEffect(() => {
+    if (agentMessage && agentMessage.text_to_speak) {
+      if (agentMessage.interview_complete) {
+        setIsAnswering(false);
+      } else {
+        setTimeLeft(QUESTION_TIME_LIMIT);
+        setIsAnswering(true);
+      }
+    }
+  }, [agentMessage]);
+
+  const handleSubmit = () => {
+    setIsAnswering(false);
+    submitAnswer();
+  };
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   return (
     <div className="interview-container">
-      <div className="interview-layout">
-        
-        <header className="interview-header">
-          <h1 className="title-gradient">Interview Console</h1>
-          <div className="status-badges">
-            <span className={`status-badge ${status}`}>
-              {status.toUpperCase()}
-            </span>
-          </div>
-        </header>
+      <header className="interview-header">
+        <h1 className="title-gradient">Interview AI</h1>
+        <div className="status-badges flex gap-4">
+          <span className={`status-badge ${status}`}>
+            {status.toUpperCase()}
+          </span>
+          {isStarted && (
+            <button onClick={finalizeSession} className="btn-danger flex items-center gap-2 px-4 py-2">
+              <Save size={16} /> Finalize Interview
+            </button>
+          )}
+        </div>
+      </header>
 
-        <div className="interview-grid">
-          <div className="video-section">
-            <div className="video-wrapper">
-              <video
-                ref={localVideoRef}
-                autoPlay
-                playsInline
-                muted
-                className={`video-element ${!isStarted ? 'hidden' : ''}`}
-              />
-              {!isStarted && (
-                <div className="video-placeholder">
-                  <VideoOff size={48} />
-                  <p>Camera is currently off</p>
-                </div>
-              )}
-            </div>
-
-            <div className="controls">
-              {!isStarted ? (
-                <button onClick={startInterview} className="btn-primary">
-                  <Video size={20} /> Start Session
-                </button>
-              ) : (
-                <button onClick={stopInterview} className="btn-danger">
-                  <VideoOff size={20} /> End Session
-                </button>
-              )}
-            </div>
-
-            {isStarted && (
-              <div className="card mt-4">
-                <h2 className="card-title">
-                  <Mic size={20} className="text-blue-400" />
-                  AI Interviewer Active
-                </h2>
-                <p className="text-sm text-slate-400 mt-2">
-                  The AI is listening and will speak dynamically. Please ensure your volume is up.
-                </p>
+      <div className="interview-layout-structured">
+        {/* Left Side: Cameras & Avatars */}
+        <div className="sidebar-cameras">
+          <div className="video-wrapper small">
+            <video
+              ref={localVideoRef}
+              autoPlay
+              playsInline
+              muted
+              className={`video-element ${!isStarted ? 'hidden' : ''}`}
+            />
+            {!isStarted && (
+              <div className="video-placeholder">
+                <VideoOff size={32} />
+                <p>Camera Off</p>
               </div>
             )}
           </div>
-
-          <div className="sidebar-section">
-            <div className="card">
-              <h2 className="card-title">
-                Required Topics Checklist
-              </h2>
-              <ul className="topics-list">
-                {TOPICS.map((topic, idx) => (
-                  <li key={idx} className="topic-item">
-                    <CheckCircle size={16} className="topic-icon-pending" />
-                    <span className="text-sm">{topic}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div className="card">
-              <h2 className="card-title">
-                <AlertCircle className="icon-warning" size={20} />
-                Live Metrics
-              </h2>
-              <div className="chart-container">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={mockData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                    <XAxis dataKey="time" stroke="#94a3b8" />
-                    <YAxis stroke="#94a3b8" />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #334155', borderRadius: '8px', color: '#fff' }} />
-                    <Line type="monotone" dataKey="engagement" stroke="#34d399" strokeWidth={3} dot={{ r: 4 }} />
-                    <Line type="monotone" dataKey="stress" stroke="#f87171" strokeWidth={3} dot={{ r: 4 }} />
-                  </LineChart>
-                </ResponsiveContainer>
+          
+          <div className="video-wrapper small bg-slate-900 flex items-center justify-center overflow-hidden">
+            {!isStarted ? (
+              <div className="video-placeholder">
+                <p>AI Offline</p>
               </div>
-            </div>
+            ) : (
+              <Canvas camera={{ position: [0, 0, 3], fov: 40 }}>
+                <ambientLight intensity={0.5} />
+                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
+                <Environment preset="city" />
+                <AgentAvatar agentMessage={agentMessage} />
+                <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
+              </Canvas>
+            )}
+          </div>
+
+          <div className="controls mt-4 w-full">
+            {!isStarted && (
+              <button onClick={startInterview} className="btn-primary w-full justify-center">
+                <Video size={20} /> Start Session
+              </button>
+            )}
           </div>
         </div>
 
+        {/* Center: Question Panel */}
+        <div className="main-question-panel">
+          {isStarted ? (
+            <div className="question-card">
+              <div className="question-header">
+                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-200">
+                  <Mic size={24} className="text-blue-400" />
+                  {agentMessage?.current_topic || "Initializing..."}
+                </h2>
+                
+                {isAnswering && (
+                  <div className={`timer-display ${timeLeft < 30 ? 'text-red-400' : 'text-slate-300'}`}>
+                    <Clock size={20} />
+                    <span className="font-mono text-2xl">{formatTime(timeLeft)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="question-body my-8 p-6 bg-slate-800 rounded-lg border border-slate-700 min-h-[200px] flex items-center justify-center">
+                <p className="text-2xl text-center leading-relaxed text-slate-100">
+                  {agentMessage?.text_to_speak || "Please wait while the AI Interviewer analyzes your profile..."}
+                </p>
+              </div>
+
+              {agentMessage?.interview_complete ? (
+                <div className="text-center">
+                  <h3 className="text-green-400 text-xl font-bold mb-4">Interview Complete</h3>
+                  <button onClick={finalizeSession} className="btn-primary px-8 py-3 text-lg">
+                    Submit & Finalize
+                  </button>
+                </div>
+              ) : (
+                <div className="question-footer flex justify-end">
+                  <button 
+                    onClick={handleSubmit} 
+                    disabled={!isAnswering}
+                    className={`btn-primary flex items-center gap-2 px-8 py-3 text-lg ${!isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <Send size={20} /> Submit Answer
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-500">
+              <p className="text-xl">Click "Start Session" to begin the interview.</p>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

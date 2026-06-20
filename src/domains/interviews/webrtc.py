@@ -53,11 +53,12 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
     """
     kind = "audio"
 
-    def __init__(self, track, candidate_id: str, tts_track: TTSAudioStreamTrack):
+    def __init__(self, track, candidate_id: str, tts_track: TTSAudioStreamTrack, channel_ref: dict):
         super().__init__()
         self.track = track
         self.candidate_id = candidate_id
         self.tts_track = tts_track
+        self.channel_ref = channel_ref
         self.audio_buffer = bytearray()
         self.is_processing = False
         
@@ -73,6 +74,15 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
             # 2. Get LLM response
             response = await generate_agent_response(self.candidate_id, text)
             text_to_speak = response.get("text_to_speak", "")
+            
+            # Send text over data channel
+            channel = self.channel_ref.get("channel")
+            if channel and channel.readyState == "open":
+                import json
+                try:
+                    channel.send(json.dumps(response))
+                except Exception as e:
+                    print(f"Error sending datachannel message: {e}")
             
             # 3. Generate TTS
             if text_to_speak:

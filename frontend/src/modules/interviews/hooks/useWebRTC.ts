@@ -4,9 +4,13 @@ export function useWebRTC(candidateId: string) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const dataChannelRef = useRef<RTCDataChannel | null>(null);
+  
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [isStarted, setIsStarted] = useState(false);
   const [status, setStatus] = useState<string>('idle');
+  const [agentMessage, setAgentMessage] = useState<any>(null);
+  const [isAudioEnabled, setIsAudioEnabled] = useState(true);
 
   // Initialize hidden audio element for remote AI voice
   useEffect(() => {
@@ -14,6 +18,13 @@ export function useWebRTC(candidateId: string) {
     audio.autoplay = true;
     audioRef.current = audio;
   }, []);
+
+  const toggleAudio = () => {
+    if (audioRef.current) {
+      audioRef.current.muted = !audioRef.current.muted;
+      setIsAudioEnabled(!audioRef.current.muted);
+    }
+  };
 
   const startInterview = async () => {
     try {
@@ -30,6 +41,19 @@ export function useWebRTC(candidateId: string) {
 
       const pc = new RTCPeerConnection();
       pcRef.current = pc;
+
+      // Create data channel to receive text_to_speak from backend
+      const dataChannel = pc.createDataChannel('agent_text');
+      dataChannelRef.current = dataChannel;
+      
+      dataChannel.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          setAgentMessage(data);
+        } catch (e) {
+          console.error("Failed to parse datachannel message", e);
+        }
+      };
 
       // Handle incoming AI voice track
       pc.ontrack = (event) => {
@@ -79,6 +103,29 @@ export function useWebRTC(candidateId: string) {
     }
     setIsStarted(false);
     setStatus('stopped');
+    setAgentMessage(null);
+  };
+
+  const submitAnswer = async () => {
+    try {
+      await fetch(`http://localhost:8000/interview/${candidateId}/submit`, {
+        method: 'POST'
+      });
+    } catch (err) {
+      console.error('Failed to submit answer', err);
+    }
+  };
+
+  const finalizeSession = async () => {
+    try {
+      await fetch(`http://localhost:8000/interview/${candidateId}/finalize`, {
+        method: 'POST'
+      });
+      stopInterview();
+      setStatus('completed');
+    } catch (err) {
+      console.error('Failed to finalize session', err);
+    }
   };
 
   useEffect(() => {
@@ -87,5 +134,16 @@ export function useWebRTC(candidateId: string) {
     };
   }, []);
 
-  return { localVideoRef, isStarted, status, startInterview, stopInterview };
+  return { 
+    localVideoRef, 
+    isStarted, 
+    status, 
+    agentMessage,
+    isAudioEnabled,
+    startInterview, 
+    stopInterview,
+    toggleAudio,
+    submitAnswer,
+    finalizeSession
+  };
 }

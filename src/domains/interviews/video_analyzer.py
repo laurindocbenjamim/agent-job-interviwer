@@ -3,6 +3,7 @@ import urllib.request
 import cv2
 import numpy as np
 import mediapipe as mp
+import math
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from typing import Tuple, Dict, Any
@@ -16,7 +17,6 @@ def download_model_if_missing() -> None:
     if not os.path.exists(MODEL_PATH):
         url = "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task"
         try:
-            # Download block by block to avoid large memory footprints
             urllib.request.urlretrieve(url, MODEL_PATH)
         except Exception as e:
             raise RuntimeError(f"Failed to download MediaPipe model: {e}")
@@ -31,26 +31,43 @@ def get_landmarker() -> vision.FaceLandmarker:
         options = vision.FaceLandmarkerOptions(
             base_options=base_options,
             output_face_blendshapes=False,
-            output_facial_transformation_matrixes=False,
+            output_facial_transformation_matrixes=True,  # Crucial for Head Pose (Yaw/Pitch)
             running_mode=vision.RunningMode.IMAGE
         )
         _landmarker_instance = vision.FaceLandmarker.create_from_options(options)
     return _landmarker_instance
 
+def extract_euler_angles_from_matrix(matrix: np.ndarray) -> Tuple[float, float, float]:
+    """Extracts yaw, pitch, and roll in degrees from a 4x4 transformation matrix."""
+    # The 3x3 rotation matrix is the top-left portion
+    rmat = matrix[:3, :3]
+    sy = math.sqrt(rmat[0, 0] * rmat[0, 0] + rmat[1, 0] * rmat[1, 0])
+    singular = sy < 1e-6
+
+    if not singular:
+        x = math.atan2(rmat[2, 1], rmat[2, 2])
+        y = math.atan2(-rmat[2, 0], sy)
+        z = math.atan2(rmat[1, 0], rmat[0, 0])
+    else:
+        x = math.atan2(-rmat[1, 2], rmat[1, 1])
+        y = math.atan2(-rmat[2, 0], sy)
+        z = 0
+
+    # Convert to degrees
+    pitch = math.degrees(x)
+    yaw = math.degrees(y)
+    roll = math.degrees(z)
+    
+    return pitch, yaw, roll
+
 def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     """
     Evaluates video quality and facial posture layout using modern MediaPipe Tasks API.
-    
-    Args:
-        frame: OpenCV BGR image array.
-        
-    Returns:
-        (is_violation, details_dict, video_quality_status)
     """
     # 1. Validate Video Brightness
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     avg_brightness = float(np.mean(gray))
-    video_quality = "Good" if avg_brightness > 75.0 else "Too Dark"
+    video_quality = "Good" if avg_brightness > 90.0 else "Poor Lighting"
 
     # 2. Convert to RGB for MediaPipe
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -60,7 +77,7 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     landmarker = get_landmarker()
     results = landmarker.detect(mp_image)
     
-    if not results.face_landmarks:
+    if not results.face_landmarks or not results.facial_transformation_matrixes:
         details = {
             "status": "No Face Detected",
             "reason": "Face not visible or lighting is too poor",
@@ -70,19 +87,28 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
 
     landmarks = results.face_landmarks[0]
     
-    # Gaze estimation: index 468 (left iris center) vs index 33 (left eye corner)
-    # Since landmarks is a list of normalized keypoints:
-    left_iris = landmarks[468]
-    left_eye_corner = landmarks[33]
+    # Check if face is centered and fully in frame using nose tip (index 1)
+    nose_tip = landmarks[1]
+    is_out_of_frame = nose_tip.x < 0.25 or nose_tip.x > 0.75 or nose_tip.y < 0.15 or nose_tip.y > 0.85
     
-    # Geometric distance calculation
-    horizontal_diff = abs(left_iris.x - left_eye_corner.x)
+    if is_out_of_frame:
+        details = {
+            "status": "Out of Frame",
+            "reason": "Please center your face in the camera.",
+            "brightness": float(avg_brightness)
+        }
+        return True, details, video_quality
     
-    # Gaze deviation violation threshold
-    is_looking_away = horizontal_diff < 0.02 or horizontal_diff > 0.06
+    # Extract true 3D Head Pose Angles
+    transformation_matrix = results.facial_transformation_matrixes[0]
+    pitch, yaw, roll = extract_euler_angles_from_matrix(transformation_matrix)
+    
+    # Thresholds: If the head turns more than 20 degrees left/right or up/down
+    is_looking_away = abs(yaw) > 20.0 or abs(pitch) > 20.0
     
     details = {
-        "gaze_metric": float(horizontal_diff),
+        "yaw": float(yaw),
+        "pitch": float(pitch),
         "brightness": float(avg_brightness),
         "status": "Looking Away" if is_looking_away else "Focused"
     }

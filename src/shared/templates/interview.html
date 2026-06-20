@@ -6,9 +6,186 @@
     <title>AI Interview Console</title>
     <meta name="description" content="AI-powered interview monitoring with gaze tracking and compliance verification">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/@pixiv/three-vrm@1.0.9/lib/three-vrm.min.js"></script>
     <style>
         {% include 'styles.css' %}
         {% include 'components.css' %}
+        
+        /* Modern Layout Additions */
+        .interview-grid {
+            display: grid;
+            grid-template-columns: 350px 1fr 300px;
+            gap: 2rem;
+            align-items: stretch;
+            height: calc(100vh - 200px);
+            max-height: 800px;
+        }
+
+        .sidebar-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .avatar-wrapper {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            border-radius: 1.5rem;
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            flex: 1;
+            position: relative;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #avatar-canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        .center-stage {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .question-card {
+            background-color: var(--bg-card);
+            border-radius: 1.5rem;
+            border: 1px solid var(--border-color);
+            padding: 2.5rem;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .topic-badge {
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.1), rgba(147, 51, 234, 0.1));
+            color: #60a5fa;
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .question-body {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: var(--bg-body);
+            border-radius: 1rem;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+            font-size: 1.5rem;
+            text-align: center;
+            line-height: 1.6;
+        }
+
+        .audio-toggle {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            cursor: pointer;
+            padding: 0.5rem 1rem;
+            background: var(--bg-card);
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            transition: all 0.2s;
+        }
+
+        .audio-toggle:hover {
+            border-color: #3b82f6;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #475569;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #3b82f6;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+        }
+
+        .btn-submit {
+            background: linear-gradient(to right, #8b5cf6, #3b82f6);
+            color: white;
+            border: none;
+            padding: 1rem 2rem;
+            border-radius: 0.75rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+            width: 100%;
+        }
+        
+        .btn-submit:hover { opacity: 0.9; }
+        .btn-submit:active { transform: scale(0.98); }
+        .btn-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .video-wrapper.small {
+            height: 220px;
+            border-radius: 1.5rem;
+        }
+
+        /* Adjust phase layout */
+        .phase { display: none; }
+        .phase.active { display: block; }
+
     </style>
 </head>
 <body>
@@ -19,18 +196,26 @@
             <span class="logo-text">Interview AI</span>
         </div>
         <div class="header-controls">
+            <label class="audio-toggle">
+                <span>🔊 Agent Voice</span>
+                <div class="switch">
+                    <input type="checkbox" id="audio-toggle-switch" checked>
+                    <span class="slider"></span>
+                </div>
+            </label>
             <span id="attempt-counter" class="attempt-badge">Attempt 1 of {{ total_user_attempt }}</span>
             <button id="theme-btn" class="theme-toggle" onclick="toggleTheme()">☀️</button>
         </div>
     </header>
 
-    <div class="container">
+    <div class="container" style="max-width: 1600px; margin: 0 auto; padding: 2rem;">
+        
         <!-- ═══ PHASE 1: Pre-Interview Preview ═══ -->
         <div id="phase-preview" class="phase active">
             <h1 class="phase-title">Prepare Your Environment</h1>
             <p class="phase-subtitle">Check your camera, lighting and microphone before starting the {{ interview_duration_minutes }}-minute interview</p>
 
-            <div class="card">
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
                 <div class="video-wrapper">
                     <video id="webcam" autoplay muted playsinline></video>
                     <div class="live-badge">
@@ -45,7 +230,12 @@
                 </div>
                 <canvas id="buffer" width="640" height="480" style="display:none;"></canvas>
 
-                <div class="env-grid">
+                <div class="camera-select-container" style="margin-top: 1rem; padding: 0 1rem;">
+                    <label for="camera-select" style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary);">Select Camera:</label>
+                    <select id="camera-select" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-color); outline: none;"></select>
+                </div>
+
+                <div class="env-grid mt-4">
                     <div class="env-item">
                         <span class="env-icon" id="check-camera">⏳</span>
                         <span class="env-label">Camera</span>
@@ -63,36 +253,68 @@
                     </div>
                 </div>
 
-                <div class="audio-meter-bar">
+                <div class="audio-meter-bar" style="margin-top: 1rem;">
                     <div id="audio-meter-fill" class="audio-meter-fill"></div>
                 </div>
-            </div>
-
-            <div class="btn-center">
-                <button id="btn-start" class="btn btn-primary" disabled onclick="startInterview()">
-                    ▶ Start Interview
-                </button>
+                
+                <div class="btn-center" style="margin-top: 2rem;">
+                    <button id="btn-start" class="btn btn-primary" disabled onclick="startInterview()">
+                        ▶ Start Interview
+                    </button>
+                </div>
             </div>
         </div>
 
         <!-- ═══ PHASE 2: Active Interview ═══ -->
         <div id="phase-interview" class="phase">
-            <div class="timer-display">
-                <div id="timer-value" class="timer-value">{{ '%02d' % interview_duration_minutes }}:00</div>
-                <div class="timer-label">Time Remaining</div>
-            </div>
-
             <div class="interview-grid">
-                <div class="card">
-                    <div class="video-wrapper">
-                        <video id="webcam-live" autoplay muted playsinline></video>
+                
+                <!-- Left: Camera & Avatar -->
+                <div class="sidebar-left">
+                    <div class="video-wrapper small">
+                        <video id="webcam-live" autoplay muted playsinline style="object-fit: cover; width: 100%; height: 100%;"></video>
                         <div class="live-badge">
                             <div class="pulse-dot"></div>
                             <span>RECORDING</span>
                         </div>
                     </div>
+                    
+                    <div class="avatar-wrapper">
+                        <div id="avatar-loading" style="position:absolute; color: var(--text-muted); font-size: 0.9rem;">Loading AI Avatar...</div>
+                        <canvas id="avatar-canvas"></canvas>
+                    </div>
                 </div>
 
+                <!-- Center: Question Stage -->
+                <div class="center-stage">
+                    <div class="question-card">
+                        <div class="question-header">
+                            <div class="topic-badge">
+                                <span id="current-topic">Initializing Interview...</span>
+                            </div>
+                            <div class="timer-display" style="margin: 0; padding: 0.5rem 1.5rem; background: var(--bg-body); border-radius: 0.5rem; border: 1px solid var(--border-color);">
+                                <div id="timer-value" class="timer-value" style="font-size: 1.5rem;">02:00</div>
+                            </div>
+                        </div>
+
+                        <div class="question-body" style="flex-direction: column; align-items: stretch; text-align: left; padding: 2rem; gap: 1.5rem;">
+                            <p id="agent-speech-text" style="color: var(--text-primary); margin: 0; font-size: 1.25rem; text-align: center;">
+                                Please wait while the AI Interviewer analyzes your profile...
+                            </p>
+                            <div id="dynamic-input-container" style="display: flex; flex-direction: column; gap: 1rem; width: 100%;">
+                                <!-- Dynamically populated by JS based on input_type -->
+                            </div>
+                        </div>
+
+                        <div class="question-footer" style="display: flex; justify-content: flex-end;">
+                            <button id="btn-submit-answer" class="btn-submit" onclick="submitAnswer()" disabled>
+                                Submit Answer
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Metrics Sidebar -->
                 <div class="side-widgets">
                     <div class="card">
                         <div class="widget-title">Environment</div>
@@ -118,8 +340,8 @@
                         </div>
                     </div>
 
-                    <button class="btn btn-danger" onclick="stopInterview()" style="width:100%;">
-                        ⏹ Stop Interview
+                    <button class="btn btn-danger" onclick="stopInterview()" style="width:100%; margin-top: 1rem;">
+                        ⏹ Finalize Interview
                     </button>
                 </div>
             </div>
@@ -131,7 +353,7 @@
             <h1 class="phase-title">Interview Complete</h1>
             <p id="end-reason" class="phase-subtitle">Your session has ended</p>
 
-            <div class="card" style="margin-top:1.5rem;">
+            <div class="card" style="margin-top:1.5rem; max-width: 800px; margin-left: auto; margin-right: auto;">
                 <div class="widget-title">Violations Report</div>
                 <div id="violations-container">
                     <p style="color:var(--text-muted);text-align:center;">

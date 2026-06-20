@@ -26,6 +26,12 @@ class Settings(BaseSettings):
     # Interview configuration
     interview_duration_minutes: int = Field(30, alias="INTERVIEW_DURATION_MINUTES")
     total_user_attempt: int = Field(1, alias="TOTAL_USER_ATTEMPT")
+    interview_objective: str = Field("Conduct a professional, friendly, and rigorous interview.", alias="INTERVIEW_OBJECTIVE")
+    interview_topics: str = Field("Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines", alias="INTERVIEW_TOPICS")
+    num_questions: int = Field(5, alias="NUM_QUESTIONS")
+    question_time_limit_seconds: int = Field(300, alias="QUESTION_TIME_LIMIT_SECONDS")
+    avatar_gender: str = Field("female", alias="AVATAR_GENDER")
+    agent_speech_speed: float = Field(1.0, alias="AGENT_SPEECH_SPEED")
 
     # Provider and STT config (if needed)
     llm_provider: Optional[str] = Field("groq", alias="LLM_PROVIDER")

@@ -2,28 +2,166 @@
  * Interview actions: start, stop, timer, violations report, and attempt management.
  */
 
-/* ─── Timer ─── */
-function startTimer() {
-    State.remainingSeconds = INTERVIEW_DURATION * 60;
+/* ─── Question Timer & Submission ─── */
+let questionTimerInterval = null;
+const QUESTION_LIMIT = 120; // Default to 2 minutes per question
+
+function startQuestionTimer() {
+    if (questionTimerInterval) clearInterval(questionTimerInterval);
+    State.remainingSeconds = QUESTION_LIMIT;
     updateTimerDisplay();
 
-    State.timerInterval = setInterval(() => {
+    const btnSubmit = $('btn-submit-answer');
+    if (btnSubmit) btnSubmit.disabled = false;
+
+    questionTimerInterval = setInterval(() => {
         State.remainingSeconds--;
         updateTimerDisplay();
 
-        if (State.remainingSeconds <= 0) {
-            endInterview('time_expired');
+let currentInputType = 'voice';
+
+async function submitAnswer(isAutoTimeout = false) {
+    if (questionTimerInterval) clearInterval(questionTimerInterval);
+    
+    let answerText = "";
+    const container = $('dynamic-input-container');
+
+    // "No Speech" Detection Logic
+    if (isAutoTimeout && currentInputType === 'voice') {
+        if (!State.hasSpoken) {
+            // User was completely silent during the time limit
+            const textEl = $('agent-speech-text');
+            if (textEl) textEl.textContent = "I can't hear you. Let's move to the next question.";
+            if (typeof playAgentSpeech === 'function') {
+                playAgentSpeech("I can't hear you. Let's move to the next question.", async () => {
+                    await sendSubmit("[Candidate did not speak]");
+                });
+            } else {
+                await sendSubmit("[Candidate did not speak]");
+            }
+            return;
+        } else {
+            answerText = "[Candidate answered via voice]";
         }
-    }, 1000);
+    } else {
+        // Collect answer based on input type
+        if (currentInputType === 'text') {
+            const textarea = container.querySelector('textarea');
+            if (textarea) answerText = textarea.value;
+        } else if (currentInputType === 'multiple_choice') {
+            const selected = container.querySelector('input[type="radio"]:checked');
+            if (selected) answerText = selected.value;
+        } else if (currentInputType === 'checkbox') {
+            const checked = container.querySelectorAll('input[type="checkbox"]:checked');
+            const vals = Array.from(checked).map(el => el.value);
+            if (vals.length > 0) answerText = vals.join(', ');
+        } else {
+            answerText = "[Candidate answered via voice]";
+        }
+    }
+
+    await sendSubmit(answerText);
 }
 
-function updateTimerDisplay() {
-    const mins = Math.floor(State.remainingSeconds / 60);
-    const secs = State.remainingSeconds % 60;
-    const el = $('timer-value');
-    if (el) {
-        el.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-        el.className = State.remainingSeconds <= 60 ? 'timer-value warning' : 'timer-value';
+async function sendSubmit(answerText) {
+    const btnSubmit = $('btn-submit-answer');
+    const speechText = $('agent-speech-text');
+    if (btnSubmit) btnSubmit.disabled = true;
+    if (speechText) speechText.textContent = "Analyzing answer and generating next question...";
+
+    try {
+        const response = await fetch(`/interview/${State.candidateId}/submit`, { 
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answer: answerText })
+        });
+        const data = await response.json();
+        
+        if (data.interview_complete) {
+            endInterview('completed');
+            return;
+        }
+
+        const topicEl = $('current-topic');
+        if (topicEl) topicEl.textContent = data.current_topic || "Next Question";
+        
+        if (speechText) speechText.textContent = data.text_to_speak;
+
+        renderDynamicInputs(data.input_type || 'voice', data.options || []);
+
+        // Reset tracking variables
+        State.hasSpoken = false;
+
+        // Play audio via Web Speech API and animate avatar
+        if (typeof playAgentSpeech === 'function') {
+            playAgentSpeech(data.text_to_speak, () => {
+                // Restart timer once agent finishes speaking
+                startQuestionTimer();
+            });
+        } else {
+            startQuestionTimer();
+        }
+
+    } catch (err) {
+        console.error("Failed to submit answer:", err);
+        if (speechText) speechText.textContent = "Connection error. Please try submitting again.";
+        if (btnSubmit) btnSubmit.disabled = false;
+    }
+}
+
+function renderDynamicInputs(inputType, options) {
+    currentInputType = inputType;
+    const container = $('dynamic-input-container');
+    if (!container) return;
+    
+    container.innerHTML = ''; // Clear previous inputs
+    
+    const baseStyle = 'width: 100%; padding: 1rem; border-radius: 0.75rem; border: 1px solid var(--border-color); background: var(--bg-card); color: var(--text-primary); outline: none; font-size: 1.1rem;';
+
+    if (inputType === 'text') {
+        const textarea = document.createElement('textarea');
+        textarea.rows = 4;
+        textarea.placeholder = "Type your answer here...";
+        textarea.style.cssText = baseStyle + ' resize: vertical;';
+        container.appendChild(textarea);
+    } 
+    else if (inputType === 'multiple_choice') {
+        options.forEach((opt, idx) => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;';
+            
+            const radio = document.createElement('input');
+            radio.type = 'radio';
+            radio.name = 'dynamic_radio';
+            radio.value = opt;
+            radio.style.cssText = 'width: 1.25rem; height: 1.25rem; accent-color: #3b82f6;';
+            
+            label.appendChild(radio);
+            label.appendChild(document.createTextNode(opt));
+            container.appendChild(label);
+        });
+    }
+    else if (inputType === 'checkbox') {
+        options.forEach((opt, idx) => {
+            const label = document.createElement('label');
+            label.style.cssText = 'display: flex; align-items: center; gap: 0.75rem; padding: 1rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 0.5rem; cursor: pointer;';
+            
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.value = opt;
+            cb.style.cssText = 'width: 1.25rem; height: 1.25rem; accent-color: #3b82f6;';
+            
+            label.appendChild(cb);
+            label.appendChild(document.createTextNode(opt));
+            container.appendChild(label);
+        });
+    }
+    else {
+        // Voice
+        const info = document.createElement('div');
+        info.innerHTML = '<span style="font-size: 2rem;">🎙️</span><p style="margin: 0; color: #94a3b8; font-size: 1rem;">Speak your answer clearly. Auto-submits when time expires.</p>';
+        info.style.cssText = 'display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; background: rgba(59, 130, 246, 0.1); border: 1px dashed rgba(59, 130, 246, 0.4); border-radius: 0.75rem; text-align: center;';
+        container.appendChild(info);
     }
 }
 
@@ -31,7 +169,6 @@ function updateTimerDisplay() {
 function startInterview() {
     State.attemptsUsed++;
     State.violationsLog = [];
-    State.remainingSeconds = INTERVIEW_DURATION * 60;
 
     // Wire the preview stream to the live video element
     const liveVideo = $('webcam-live');
@@ -44,10 +181,12 @@ function startInterview() {
     showPhase('interview');
     connectWebSocket();
     startFrameStreaming();
-    startTimer();
-
+    
     // Start brightness check loop during interview
     State.brightnessInterval = setInterval(checkBrightness, 2000);
+
+    // Initial question fetch
+    submitAnswer();
 }
 
 /* ─── Stop Interview ─── */

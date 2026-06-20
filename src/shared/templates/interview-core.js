@@ -53,14 +53,43 @@ function showPhase(phase) {
 }
 
 /* ─── Camera & Mic Setup ─── */
-async function initCamera() {
-    // Request video and audio separately to avoid total failure if one device is missing
+async function getConnectedDevices() {
     try {
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: true });
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoCameras = devices.filter(device => device.kind === 'videoinput');
+        const select = $('camera-select');
+        if (select && videoCameras.length > 0) {
+            select.innerHTML = '';
+            videoCameras.forEach(camera => {
+                const option = document.createElement('option');
+                option.value = camera.deviceId;
+                option.text = camera.label || `Camera ${select.length + 1}`;
+                select.appendChild(option);
+            });
+            select.onchange = () => {
+                if (State.localStream) {
+                    State.localStream.getVideoTracks().forEach(track => track.stop());
+                }
+                initCamera(select.value);
+            };
+        }
+    } catch (e) {
+        console.error("Error enumerating devices:", e);
+    }
+}
+
+async function initCamera(deviceId = null) {
+    try {
+        const videoConstraints = deviceId ? { deviceId: { exact: deviceId } } : true;
+        const videoStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
         State.localStream = videoStream;
         video.srcObject = videoStream;
         updateEnvCheck('camera', true);
         updateEnvStatus('env-camera', 'Good', 'ok');
+        
+        // Populate dropdown on first load
+        if (!deviceId) getConnectedDevices();
+        
     } catch (err) {
         console.error('[Camera] Failed to access webcam:', err);
         updateEnvCheck('camera', false);
@@ -68,15 +97,16 @@ async function initCamera() {
     }
 
     try {
-        const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        // Merge audio track into the main stream
-        if (State.localStream) {
-            audioStream.getAudioTracks().forEach(t => State.localStream.addTrack(t));
-        } else {
-            State.localStream = audioStream;
+        if (!State.audioContext) {
+            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            if (State.localStream) {
+                audioStream.getAudioTracks().forEach(t => State.localStream.addTrack(t));
+            } else {
+                State.localStream = audioStream;
+            }
+            initAudioMeter(State.localStream);
+            updateEnvCheck('mic', true);
         }
-        initAudioMeter(State.localStream);
-        updateEnvCheck('mic', true);
     } catch (err) {
         console.error('[Audio] Failed to access microphone:', err);
         updateEnvCheck('mic', false);
@@ -102,6 +132,9 @@ function initAudioMeter(stream) {
     const meterFill = $('audio-meter-fill');
     const voiceStatus = $('env-voice');
 
+    // Global tracking flag for speech detection
+    State.hasSpoken = false;
+
     setInterval(() => {
         if (!State.analyser) return;
         State.analyser.getByteFrequencyData(dataArray);
@@ -118,6 +151,7 @@ function initAudioMeter(stream) {
             } else if (avg >= 15) {
                 voiceStatus.textContent = 'Good';
                 voiceStatus.className = 'env-status ok';
+                State.hasSpoken = true; // User actually spoke!
             } else {
                 voiceStatus.textContent = 'Silent';
                 voiceStatus.className = 'env-status warn';
@@ -216,3 +250,137 @@ function startFrameStreaming() {
 function stopFrameStreaming() {
     if (frameInterval) { clearInterval(frameInterval); frameInterval = null; }
 }
+
+/* ─── Web Speech API & 3D Avatar (Three-VRM) ─── */
+let currentVrm = null;
+let currentMixer = null;
+const clock = new THREE.Clock();
+let isSpeaking = false;
+let blinkInterval = null;
+
+function initAvatar() {
+    const container = $('avatar-canvas');
+    if (!container) return;
+
+    const renderer = new THREE.WebGLRenderer({ canvas: container, alpha: true, antialias: true });
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    const camera = new THREE.PerspectiveCamera(30.0, container.clientWidth / container.clientHeight, 0.1, 20.0);
+    camera.position.set(0.0, 1.45, 1.5);
+
+    const scene = new THREE.Scene();
+
+    const light = new THREE.DirectionalLight(0xffffff, 1.0);
+    light.position.set(1.0, 1.0, 1.0).normalize();
+    scene.add(light);
+    
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambientLight);
+
+    const loader = new THREE.GLTFLoader();
+    
+    // Choose model based on gender variable passed from Jinja
+    const gender = '{{ avatar_gender }}';
+    let modelUrl = 'https://models.readyplayer.me/64b58e7b9f36f6d6fc3a6566.glb'; // Default Female
+    if (gender === 'male') {
+        modelUrl = 'https://models.readyplayer.me/64b58e7b9f36f6d6fc3a6565.glb'; // Default Male
+    }
+
+    loader.load(
+        modelUrl,
+        (gltf) => {
+            $('avatar-loading').style.display = 'none';
+            THREE.VRMUtils.removeUnnecessaryJoints(gltf.scene);
+
+            THREE.VRM.from(gltf).then((vrm) => {
+                currentVrm = vrm;
+                scene.add(vrm.scene);
+                
+                vrm.scene.rotation.y = Math.PI;
+                
+                blinkInterval = setInterval(() => {
+                    if (currentVrm) {
+                        currentVrm.blendShapeProxy.setValue(THREE.VRMBlendShapePresetName.Blink, 1.0);
+                        setTimeout(() => {
+                            if (currentVrm) currentVrm.blendShapeProxy.setValue(THREE.VRMBlendShapePresetName.Blink, 0.0);
+                        }, 100);
+                    }
+                }, 4000);
+            });
+        },
+        (progress) => console.log('Loading avatar...', 100.0 * (progress.loaded / progress.total), '%'),
+        (error) => console.error(error)
+    );
+
+    function animate() {
+        requestAnimationFrame(animate);
+        const deltaTime = clock.getDelta();
+        
+        if (currentVrm) {
+            currentVrm.update(deltaTime);
+            
+            if (isSpeaking) {
+                const s = Math.sin(clock.elapsedTime * 15);
+                const val = (s + 1) / 2 * 0.8;
+                currentVrm.blendShapeProxy.setValue(THREE.VRMBlendShapePresetName.A, val);
+            } else {
+                currentVrm.blendShapeProxy.setValue(THREE.VRMBlendShapePresetName.A, 0.0);
+            }
+        }
+        
+        if (currentMixer) {
+            currentMixer.update(deltaTime);
+        }
+        
+        renderer.render(scene, camera);
+    }
+    animate();
+}
+
+function playAgentSpeech(text, onEndCallback) {
+    const audioToggle = $('audio-toggle-switch');
+    isSpeaking = true;
+
+    if (audioToggle && audioToggle.checked) {
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(text);
+            
+            const voices = window.speechSynthesis.getVoices();
+            const preferredVoice = voices.find(v => v.lang.includes('en-US') && v.name.includes('Google')) || voices.find(v => v.lang.includes('en'));
+            if (preferredVoice) utterance.voice = preferredVoice;
+            
+            // Set speed from env variable
+            const speedVar = parseFloat('{{ agent_speech_speed }}');
+            utterance.rate = isNaN(speedVar) ? 1.0 : speedVar;
+            utterance.pitch = 1.0;
+            
+            utterance.onend = () => {
+                isSpeaking = false;
+                if (onEndCallback) onEndCallback();
+            };
+            
+            window.speechSynthesis.speak(utterance);
+        } else {
+            console.warn("Web Speech API not supported.");
+            setTimeout(() => {
+                isSpeaking = false;
+                if (onEndCallback) onEndCallback();
+            }, text.length * 50);
+        }
+    } else {
+        const durationMs = Math.max(2000, (text.split(' ').length / 2.5) * 1000);
+        setTimeout(() => {
+            isSpeaking = false;
+            if (onEndCallback) onEndCallback();
+        }, durationMs);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
+    }
+    setTimeout(initAvatar, 500);
+});

@@ -56,46 +56,55 @@ async def get_violations_report(candidate_id: str):
     )
     return report.model_dump()
 
-@router.websocket("/ws/interview/{candidate_id}")
-async def interview_stream(websocket: WebSocket, candidate_id: str):
-    """WebSocket stream for camera frames and compliance verification."""
-    await websocket.accept()
+from pydantic import BaseModel
+from aiortc import RTCPeerConnection, RTCSessionDescription
+from src.domains.interviews.webrtc import InterviewVideoStreamTrack, InterviewAudioStreamTrack, TTSAudioStreamTrack
 
-    try:
-        while True:
-            try:
-                data = await websocket.receive_text()
-                payload = json.loads(data)
+# Store peer connections to prevent garbage collection and allow cleanup
+peer_connections = set()
 
-                if "image" not in payload:
-                    continue
+class OfferRequest(BaseModel):
+    sdp: str
+    type: str
 
-                try:
-                    base64_data = payload["image"].split(",")[1]
-                    image_bytes = base64.b64decode(base64_data)
-                    np_array = np.frombuffer(image_bytes, dtype=np.uint8)
-                    frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-                except Exception as e:
-                    print(f"[WS DEBUG] Base64 decode failed for {candidate_id}: {e}")
-                    continue
+@router.post("/interview/{candidate_id}/offer")
+async def offer(candidate_id: str, offer_request: OfferRequest):
+    """WebRTC signaling endpoint. Accepts an SDP offer and returns an answer."""
+    offer = RTCSessionDescription(sdp=offer_request.sdp, type=offer_request.type)
+    pc = RTCPeerConnection()
+    peer_connections.add(pc)
+    
+    # Setup TTS Audio Track to send to the candidate
+    tts_track = TTSAudioStreamTrack()
+    pc.addTrack(tts_track)
 
-                if frame is None:
-                    continue
+    @pc.on("connectionstatechange")
+    async def on_connectionstatechange():
+        print(f"Connection state is {pc.connectionState}")
+        if pc.connectionState == "failed" or pc.connectionState == "closed":
+            await pc.close()
+            peer_connections.discard(pc)
+            await log_activity(candidate_id, "session_disconnected", {"status": pc.connectionState})
 
-                is_violation, details, video_quality = await asyncio.to_thread(analyze_frame, frame)
+    @pc.on("track")
+    def on_track(track):
+        if track.kind == "video":
+            # Wrap the incoming video track with our custom tracker
+            local_video = InterviewVideoStreamTrack(track, candidate_id)
+            pc.addTrack(local_video)
+            
+            @track.on("ended")
+            async def on_ended():
+                await log_activity(candidate_id, "video_track_ended", {})
+                
+        elif track.kind == "audio":
+            # Wrap the incoming audio track
+            local_audio = InterviewAudioStreamTrack(track, candidate_id, tts_track)
+            pc.addTrack(local_audio)
 
-                response_data = await evaluate_candidate_frame(
-                    candidate_id=candidate_id,
-                    is_violation=is_violation,
-                    details=details,
-                    video_quality=video_quality,
-                )
+    # Handle offer and create answer
+    await pc.setRemoteDescription(offer)
+    answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
 
-                await websocket.send_json(response_data)
-            except Exception as inner_e:
-                print(f"[WS DEBUG] Inner loop error for {candidate_id}: {inner_e}")
-
-    except WebSocketDisconnect:
-        await log_activity(candidate_id, "session_disconnected", {"status": "closed"})
-    except Exception as outer_e:
-        print(f"[WS DEBUG] Outer loop error for {candidate_id}: {outer_e}")
+    return {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}

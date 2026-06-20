@@ -21,18 +21,21 @@ def download_model_if_missing() -> None:
         except Exception as e:
             raise RuntimeError(f"Failed to download MediaPipe model: {e}")
 
-# Ensure the model is available before initializing
-download_model_if_missing()
+_landmarker_instance = None
 
-# Initialize FaceLandmarker using modern Tasks API
-base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
-options = vision.FaceLandmarkerOptions(
-    base_options=base_options,
-    output_face_blendshapes=False,
-    output_facial_transformation_matrixes=False,
-    running_mode=vision.RunningMode.IMAGE
-)
-landmarker = vision.FaceLandmarker.create_from_options(options)
+def get_landmarker() -> vision.FaceLandmarker:
+    global _landmarker_instance
+    if _landmarker_instance is None:
+        download_model_if_missing()
+        base_options = python.BaseOptions(model_asset_path=MODEL_PATH)
+        options = vision.FaceLandmarkerOptions(
+            base_options=base_options,
+            output_face_blendshapes=False,
+            output_facial_transformation_matrixes=False,
+            running_mode=vision.RunningMode.IMAGE
+        )
+        _landmarker_instance = vision.FaceLandmarker.create_from_options(options)
+    return _landmarker_instance
 
 def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     """
@@ -54,6 +57,7 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
     
     # 3. Perform detection
+    landmarker = get_landmarker()
     results = landmarker.detect(mp_image)
     
     if not results.face_landmarks:

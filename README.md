@@ -228,11 +228,11 @@ Set environment variables in `.env`:
 cd agent-job-interviwer
 
 # Create virtual environment
-python -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 
 # Install dependencies
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 
 # Configure .env (edit with your credentials)
 # Ensure MONGODB_URI, REDIS_URL, and JWT_SECRET are set
@@ -247,7 +247,7 @@ uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
 ### Run with Python directly
 
 ```bash
-python -m uvicorn src.main:app --host 0.0.0.0 --port 8000
+python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
 ### Open the dashboard

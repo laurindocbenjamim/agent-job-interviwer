@@ -7,27 +7,29 @@ def test_analyze_frame_dark_room():
     """Test that a dark frame results in a 'Too Dark' quality status."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     
-    with patch("src.domains.interviews.video_analyzer.landmarker.detect") as mock_detect:
+    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+        mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
         is_violation, details, quality = analyze_frame(frame)
         
         assert quality == "Too Dark"
-        assert is_violation is False
-        assert details == {"reason": "No face in frame"}
+        assert is_violation is True
+        assert details["status"] == "No Face Detected"
 
 def test_analyze_frame_bright_room_no_face():
     """Test that a bright frame with no face returns Good quality but no face."""
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
     
-    with patch("src.domains.interviews.video_analyzer.landmarker.detect") as mock_detect:
+    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+        mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
         is_violation, details, quality = analyze_frame(frame)
         
         assert quality == "Good"
-        assert is_violation is False
-        assert details == {"reason": "No face in frame"}
+        assert is_violation is True
+        assert details["status"] == "No Face Detected"
 
 def test_analyze_frame_focused_gaze():
     """Test when horizontal distance is in focused range (0.02 - 0.06)."""
@@ -44,7 +46,8 @@ def test_analyze_frame_focused_gaze():
     mock_landmarks[468] = mock_landmark_left_iris
     mock_landmarks[33] = mock_landmark_left_eye_corner
     
-    with patch("src.domains.interviews.video_analyzer.landmarker.detect") as mock_detect:
+    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+        mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
         
         is_violation, details, quality = analyze_frame(frame)
@@ -68,7 +71,8 @@ def test_analyze_frame_looking_away_gaze():
     mock_landmarks[468] = mock_landmark_left_iris
     mock_landmarks[33] = mock_landmark_left_eye_corner
     
-    with patch("src.domains.interviews.video_analyzer.landmarker.detect") as mock_detect:
+    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+        mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
         
         is_violation, details, quality = analyze_frame(frame)

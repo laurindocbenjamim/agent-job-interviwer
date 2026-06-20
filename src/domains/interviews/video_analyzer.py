@@ -47,7 +47,7 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     # 1. Validate Video Brightness
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     avg_brightness = float(np.mean(gray))
-    video_quality = "Good" if avg_brightness > 40.0 else "Too Dark"
+    video_quality = "Good" if avg_brightness > 75.0 else "Too Dark"
 
     # 2. Convert to RGB for MediaPipe
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -57,7 +57,12 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     results = landmarker.detect(mp_image)
     
     if not results.face_landmarks:
-        return False, {"reason": "No face in frame"}, video_quality
+        details = {
+            "status": "No Face Detected",
+            "reason": "Face not visible or lighting is too poor",
+            "brightness": float(avg_brightness)
+        }
+        return True, details, video_quality
 
     landmarks = results.face_landmarks[0]
     

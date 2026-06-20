@@ -138,7 +138,7 @@ function checkBrightness() {
     const lightStatus = $('env-light');
     const overlay = $('bad-light-overlay');
 
-    if (avg > 60) {
+    if (avg > 75) {
         if (lightStatus) { lightStatus.textContent = 'Good'; lightStatus.className = 'env-status ok'; }
         if (overlay) overlay.style.display = 'none';
         updateEnvCheck('light', true);

@@ -338,6 +338,14 @@
                             <span class="status-label">Attempt</span>
                             <span id="live-attempt" class="status-val">1 / {{ total_user_attempt }}</span>
                         </div>
+                        <div class="status-row">
+                            <span class="status-label">Start Time</span>
+                            <span id="live-start-time" class="status-val">-</span>
+                        </div>
+                        <div class="status-row">
+                            <span class="status-label">End Time</span>
+                            <span id="live-end-time" class="status-val">-</span>
+                        </div>
                     </div>
 
                     <button class="btn btn-danger" onclick="stopInterview()" style="width:100%; margin-top: 1rem;">
@@ -353,19 +361,7 @@
             <h1 class="phase-title">Interview Complete</h1>
             <p id="end-reason" class="phase-subtitle">Your session has ended</p>
 
-            <div class="card" style="margin-top:1.5rem; max-width: 800px; margin-left: auto; margin-right: auto;">
-                <div class="widget-title">Violations Report</div>
-                <div id="violations-container">
-                    <p style="color:var(--text-muted);text-align:center;">
-                        Click below to view detected violations
-                    </p>
-                </div>
-            </div>
-
             <div class="actions-row">
-                <button class="btn btn-primary" onclick="loadViolationsReport()">
-                    📊 View Violations Report
-                </button>
                 <button id="btn-restart" class="btn btn-outline" onclick="restartInterview()" style="display:none;">
                     🔄 Start Again
                 </button>

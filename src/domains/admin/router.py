@@ -101,3 +101,13 @@ async def clone_voice(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Failed to save audio file: {str(e)}")
         
     return {"status": "success", "message": "Voice cloned successfully.", "filename": file.filename}
+
+class InjectedQuestion(BaseModel):
+    question: str
+
+@router.post("/inject-question/{candidate_id}")
+async def inject_question(candidate_id: str, payload: InjectedQuestion):
+    """Queues a custom question from the admin to be asked to the candidate."""
+    from src.domains.interviews.agent import queue_injected_question
+    queue_injected_question(candidate_id, payload.question)
+    return {"status": "success", "message": "Question queued successfully."}

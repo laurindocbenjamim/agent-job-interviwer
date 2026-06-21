@@ -184,6 +184,15 @@ function renderDynamicInputs(inputType, options) {
 function startInterview() {
     State.attemptsUsed++;
     State.violationsLog = [];
+    State.isFinished = false;
+
+    // Record start time
+    const startTimeStr = new Date().toLocaleTimeString();
+    State.startTime = startTimeStr;
+    const startEl = $('live-start-time');
+    if (startEl) startEl.textContent = startTimeStr;
+    const endEl = $('live-end-time');
+    if (endEl) endEl.textContent = '-';
 
     // Wire the preview stream to the live video element
     const liveVideo = $('webcam-live');
@@ -210,6 +219,21 @@ function stopInterview() {
 }
 
 function endInterview(reason) {
+    State.isFinished = true;
+    isSpeaking = false;
+    
+    // Clear speech timeout
+    if (State.speechTimeout) {
+        clearTimeout(State.speechTimeout);
+        State.speechTimeout = null;
+    }
+
+    // Set end time
+    const endTimeStr = new Date().toLocaleTimeString();
+    State.endTime = endTimeStr;
+    const endEl = $('live-end-time');
+    if (endEl) endEl.textContent = endTimeStr;
+
     // Clear timers
     if (State.timerInterval) { clearInterval(State.timerInterval); State.timerInterval = null; }
     if (State.brightnessInterval) { clearInterval(State.brightnessInterval); State.brightnessInterval = null; }
@@ -221,6 +245,11 @@ function endInterview(reason) {
     // Stop active or queued speech synthesis immediately
     if ('speechSynthesis' in window) {
         window.speechSynthesis.cancel();
+        if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+            window.speechSynthesis.cancel();
+        }
     }
 
     // Update post-interview UI

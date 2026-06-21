@@ -59,13 +59,36 @@ async def get_violations_report(candidate_id: str):
         total_strikes=max((ev.strike_number or 0 for ev in events), default=0),
         events=events,
     )
-    return report.model_dump()
+    result = report.model_dump()
+    
+    from src.shared.redis_client import redis_client
+    try:
+        start_val = await redis_client.get(f"cv_threshold:start_time:{candidate_id}")
+        result["start_time"] = start_val.decode() if isinstance(start_val, bytes) else start_val
+    except Exception:
+        result["start_time"] = None
+
+    try:
+        end_val = await redis_client.get(f"cv_threshold:end_time:{candidate_id}")
+        result["end_time"] = end_val.decode() if isinstance(end_val, bytes) else end_val
+    except Exception:
+        result["end_time"] = None
+    
+    from src.domains.interviews.agent import generate_compliance_analysis
+    result["compliance_analysis"] = await generate_compliance_analysis(candidate_id, result)
+    return result
 
 @router.websocket("/ws/interview/{candidate_id}")
 async def interview_stream(websocket: WebSocket, candidate_id: str):
     """WebSocket stream for camera frames and compliance verification."""
     await websocket.accept()
     active_sessions[candidate_id] = {}
+
+    # Record interview start time in Redis
+    from src.shared.redis_client import redis_client
+    import datetime
+    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    await redis_client.set(f"cv_threshold:start_time:{candidate_id}", now_str, ex=7200)
 
     try:
         while True:
@@ -148,6 +171,10 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
     except Exception as outer_e:
         print(f"[WS DEBUG] Outer loop error for {candidate_id}: {outer_e}")
     finally:
+        import datetime
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        from src.shared.redis_client import redis_client
+        await redis_client.set(f"cv_threshold:end_time:{candidate_id}", now_str, ex=7200)
         active_sessions.pop(candidate_id, None)
 
 from pydantic import BaseModel

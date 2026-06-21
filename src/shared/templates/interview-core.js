@@ -16,6 +16,10 @@ const State = {
     violationsLog: [],
     currentPhase: 'preview',
     candidateId: window.location.pathname.split('/').pop() || 'candidate_123',
+    isFinished: false,
+    speechTimeout: null,
+    startTime: null,
+    endTime: null,
 };
 
 /* ─── DOM References ─── */
@@ -341,6 +345,13 @@ function initAvatar() {
 }
 
 function playAgentSpeech(text, onEndCallback) {
+    if (State.isFinished) {
+        isSpeaking = false;
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+        return;
+    }
     const audioToggle = $('audio-toggle-switch');
     isSpeaking = true;
 
@@ -360,21 +371,24 @@ function playAgentSpeech(text, onEndCallback) {
             
             utterance.onend = () => {
                 isSpeaking = false;
+                if (State.isFinished) return;
                 if (onEndCallback) onEndCallback();
             };
             
             window.speechSynthesis.speak(utterance);
         } else {
             console.warn("Web Speech API not supported.");
-            setTimeout(() => {
+            State.speechTimeout = setTimeout(() => {
                 isSpeaking = false;
+                if (State.isFinished) return;
                 if (onEndCallback) onEndCallback();
             }, text.length * 50);
         }
     } else {
         const durationMs = Math.max(2000, (text.split(' ').length / 2.5) * 1000);
-        setTimeout(() => {
+        State.speechTimeout = setTimeout(() => {
             isSpeaking = false;
+            if (State.isFinished) return;
             if (onEndCallback) onEndCallback();
         }, durationMs);
     }

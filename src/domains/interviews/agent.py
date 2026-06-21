@@ -2,11 +2,12 @@ import json
 import os
 import asyncio
 from typing import Dict, List, Tuple
-from groq import AsyncGroq
+from langchain_groq import ChatGroq
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import tool
 from src.config.settings import settings
 
-# In-memory session store for interview states.
-# For production, move this to Redis.
+# Bounded context session state
 _sessions: Dict[str, List[Dict[str, str]]] = {}
 _injected_questions_queue: Dict[str, List[str]] = {}
 
@@ -16,28 +17,30 @@ def queue_injected_question(candidate_id: str, question: str) -> None:
         _injected_questions_queue[candidate_id] = []
     _injected_questions_queue[candidate_id].append(question)
 
-def get_dynamic_prompt() -> str:
-    topics_list = [t.strip() for t in settings.interview_topics.split(",")]
-    topics_str = "\n".join([f"{i+1}. {topic}" for i, topic in enumerate(topics_list)])
-    
-    return f"""You are an expert AI Job Interviewer. Your objective is to {settings.interview_objective}.
+def get_dynamic_prompt(objective: str = None, topics: str = None, num_questions: int = None) -> str:
+    """Generates the dynamic prompt string based on settings."""
+    obj = objective if objective else settings.interview_objective
+    tops = topics if topics else settings.interview_topics
+    num_q = num_questions if num_questions is not None else settings.num_questions
 
-You must evaluate the candidate on the following REQUIRED TOPICS:
+    topics_list = [t.strip() for t in tops.split(",")]
+    topics_str = "\n".join([f"{i+1}. {topic}" for i, topic in enumerate(topics_list)])
+    return f"""You are an expert AI Job Interviewer. Your objective is to {obj}.
+
+Evaluate the candidate on the following REQUIRED TOPICS:
 {topics_str}
 
 CRITICAL INSTRUCTIONS:
-- Be conversational. Acknowledge their previous answer naturally before moving on or asking a follow-up question.
+- Be conversational. Acknowledge their previous answer naturally before moving on.
 - Ask exactly ONE question at a time.
-- You can ask different types of questions. Set `input_type` to one of: "voice" (for spoken answers), "text" (for written answers), "multiple_choice" (for radio buttons), or "checkbox" (for multi-select).
-- If `input_type` is "multiple_choice" or "checkbox", you MUST provide an array of strings in the `options` field. Otherwise, leave it empty.
-- You must end the interview after exactly {settings.num_questions} questions have been asked in total.
-- Keep track of which topics have been fully covered. Once {settings.num_questions} questions are asked or all topics are completed, politely wrap up the interview and set "interview_complete": true.
+- Set `input_type` to one of: "voice", "text", "multiple_choice", or "checkbox".
+- If `input_type` is "multiple_choice" or "checkbox", provide options in the `options` array.
+- You must end the interview after exactly {num_q} questions.
+- Once {num_q} questions are asked, wrap up and set "interview_complete": true.
 
-OUTPUT FORMAT:
-You must ALWAYS respond in a strict JSON format. Do not include any conversational text outside the JSON block. Use the following schema:
-
+OUTPUT FORMAT (strict JSON block):
 {{
-  "text_to_speak": "The exact question or response the candidate will hear and read on screen.",
+  "text_to_speak": "Question or response the candidate will hear/read.",
   "current_topic": "The topic currently being evaluated",
   "input_type": "voice",
   "options": [],
@@ -45,18 +48,21 @@ You must ALWAYS respond in a strict JSON format. Do not include any conversation
   "interview_complete": false
 }}"""
 
+@tool
+def get_compliance_rules() -> str:
+    """Skill to fetch the active interview rules defined by the manager."""
+    return (
+        "- Max Accepted Yaw (head pose left/right): 20 degrees\n"
+        "- Max Accepted Pitch (head pose up/down): 20 degrees\n"
+        "- Gaze sensitivity limits: 0.025 to 0.055"
+    )
+
 async def transcribe_audio(audio_bytes: bytes) -> str:
-    """Uses Groq Whisper to transcribe PCM audio bytes."""
+    """Uses Groq client to transcribe audio bytes."""
+    from groq import AsyncGroq
     if not settings.groq_api_key:
-        print("Warning: GROQ_API_KEY not set. Returning mock transcription.")
-        return "This is a mock transcription of what I just said."
-        
+        return "Mock transcription: Please configure GROQ_API_KEY."
     client = AsyncGroq(api_key=settings.groq_api_key)
-    
-    # Write bytes to a temporary wav file for Groq API
-    # Groq whisper requires file-like objects with a valid extension
-    # We assume the incoming bytes are a valid wav file for this function
-    # In reality, we'll construct the WAV header in webrtc.py before calling this.
     try:
         response = await client.audio.transcriptions.create(
             file=("candidate.wav", audio_bytes),
@@ -68,102 +74,170 @@ async def transcribe_audio(audio_bytes: bytes) -> str:
         print(f"Transcription error: {e}")
         return ""
 
-async def generate_agent_response(candidate_id: str, candidate_text: str) -> dict:
-    """Calls Groq LLaMA to generate the next response based on history."""
-    if not settings.groq_api_key:
-        return {
-            "text_to_speak": "Mock LLM response: Please set GROQ_API_KEY.",
-            "current_topic": "Configuration",
-            "topics_completed": [],
-            "interview_complete": False
-        }
-        
-    if candidate_id not in _sessions:
-        _sessions[candidate_id] = [
-            {"role": "system", "content": get_dynamic_prompt()}
-        ]
-        
-    if candidate_text:
-        _sessions[candidate_id].append({"role": "user", "content": candidate_text})
-        
-    # Check for queued questions and inject them
-    if _injected_questions_queue.get(candidate_id):
-        injected_q = _injected_questions_queue[candidate_id].pop(0)
-        _sessions[candidate_id].append({
-            "role": "system",
-            "content": f"CRITICAL: The admin has injected a custom question: '{injected_q}'. You must analyze the candidate's previous responses and ask this question to the candidate now. Do not end the interview yet; set 'interview_complete': false in your response."
-        })
-        
-    client = AsyncGroq(api_key=settings.groq_api_key)
+class InterviewAgent:
+    """Agent orchestrator for handling active interview responses (SRP/Facade)."""
     
-    try:
-        response = await client.chat.completions.create(
-            messages=_sessions[candidate_id],
+    def __init__(self):
+        self.llm = ChatGroq(
+            groq_api_key=settings.groq_api_key,
             model="llama-3.1-8b-instant",
             response_format={"type": "json_object"}
-        )
-        
-        reply_json = response.choices[0].message.content
-        _sessions[candidate_id].append({"role": "assistant", "content": reply_json})
-        
-        return json.loads(reply_json)
-    except Exception as e:
-        print(f"Agent error: {e}")
-        return {
-            "text_to_speak": "I'm sorry, I'm having trouble processing that.",
-            "current_topic": "Error",
-            "topics_completed": [],
-            "interview_complete": False
-        }
+        ) if settings.groq_api_key else None
 
-async def generate_compliance_analysis(candidate_id: str, violations_summary: dict) -> str:
-    """Uses Groq to analyze the interview timeline, answers, and compliance log."""
-    transcript = _sessions.get(candidate_id, [])
-    transcript_text = ""
-    for msg in transcript:
-        if msg["role"] == "user":
-            transcript_text += f"Candidate Answer: {msg['content']}\n"
-        elif msg["role"] == "assistant":
-            try:
-                content_dict = json.loads(msg["content"])
-                transcript_text += f"Agent Question: {content_dict.get('text_to_speak', '')}\n"
-            except Exception:
-                transcript_text += f"Agent Question: {msg['content']}\n"
+    async def get_response(self, candidate_id: str, candidate_text: str) -> dict:
+        if not self.llm:
+            return {
+                "text_to_speak": "Mock LLM response: Please set GROQ_API_KEY.",
+                "current_topic": "Configuration",
+                "topics_completed": [],
+                "interview_complete": False
+            }
+        
+        from src.shared.postgres_db import get_postgres_config
+        config = await get_postgres_config(candidate_id)
+        base_time_limit = config.question_time_limit_seconds if config else 60
 
-    prompt = f"""You are a Specialist compliance analyst agent.
-Analyze the following interview data:
+        if candidate_id not in _sessions:
+            if config:
+                raw_prompt = get_dynamic_prompt(
+                    objective=config.interview_objective,
+                    topics=config.interview_topics,
+                    num_questions=config.num_questions
+                )
+            else:
+                raw_prompt = get_dynamic_prompt()
+            escaped_prompt = raw_prompt.replace("{", "{{").replace("}", "}}")
+            _sessions[candidate_id] = [("system", escaped_prompt)]
+            
+        if candidate_text:
+            _sessions[candidate_id].append(("user", candidate_text))
+            
+        if _injected_questions_queue.get(candidate_id):
+            injected_q = _injected_questions_queue[candidate_id].pop(0)
+            msg = f"CRITICAL: The admin has injected a custom question: '{injected_q}'. Ask this question now. Set 'interview_complete': false."
+            _sessions[candidate_id].append(("system", msg))
+            
+        try:
+            prompt = ChatPromptTemplate.from_messages(_sessions[candidate_id])
+            chain = prompt | self.llm
+            response = await chain.ainvoke({})
+            reply_json = response.content
+            _sessions[candidate_id].append(("assistant", reply_json))
+            
+            result = json.loads(reply_json)
+            # Dynamic time limit calculation based on characteristics
+            inp_type = result.get("input_type", "voice")
+            text_to_speak = result.get("text_to_speak", "")
+            
+            # Dynamic rules:
+            if inp_type == "text":
+                limit = 90
+            elif inp_type in ("multiple_choice", "checkbox"):
+                limit = 45
+            else:
+                limit = base_time_limit
+
+            # Extra time for long strings
+            if len(text_to_speak) > 100:
+                limit += 15
+
+            result["question_time_limit"] = limit
+            return result
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            print(f"Agent error: {e}")
+            return {
+                "text_to_speak": f"I'm sorry, I'm having trouble processing that. Error: {str(e)}",
+                "current_topic": "Error",
+                "topics_completed": [],
+                "interview_complete": False
+            }
+
+class ComplianceAnalystAgent:
+    """Agent orchestrator for compiling compliance review recommendations."""
+
+    def __init__(self):
+        self.llm = ChatGroq(
+            groq_api_key=settings.groq_api_key,
+            model="llama-3.1-8b-instant"
+        ) if settings.groq_api_key else None
+
+    async def analyze(self, candidate_id: str, violations_summary: dict) -> str:
+        if not self.llm:
+            return "GROQ API key is not configured. Mock: Candidate showed general compliance."
+            
+        transcript = _sessions.get(candidate_id, [])
+        transcript_text = ""
+        for role, content in transcript:
+            if role == "user":
+                transcript_text += f"Candidate Answer: {content}\n"
+            elif role == "assistant":
+                try:
+                    content_dict = json.loads(content)
+                    transcript_text += f"Agent Question: {content_dict.get('text_to_speak', '')}\n"
+                except Exception:
+                    transcript_text += f"Agent Question: {content}\n"
+
+        from src.shared.postgres_db import get_postgres_config
+        config = await get_postgres_config(candidate_id)
+        if config:
+            rules = (
+                f"- Interview Duration: {config.interview_duration_minutes} minutes\n"
+                f"- Max Questions: {config.num_questions}\n"
+                f"- Speech Language: {config.speech_language}\n"
+                f"- Text/Question Language: {config.text_language}\n"
+                f"- Max Accepted Yaw (head pose left/right): 20 degrees\n"
+                f"- Max Accepted Pitch (head pose up/down): 20 degrees\n"
+                f"- Gaze sensitivity limits: 0.025 to 0.055"
+            )
+        else:
+            rules = get_compliance_rules.invoke({})
+
+        prompt_template = ChatPromptTemplate.from_messages([
+            ("system", "You are a Specialist compliance analyst agent. Analyze compliance rules and logs."),
+            ("user", """Analyze the following interview data:
 Candidate ID: {candidate_id}
-Total Violations: {violations_summary.get('total_violations', 0)}
-Total Strikes: {violations_summary.get('total_strikes', 0)}
-Start Time: {violations_summary.get('start_time', 'N/A')}
-End Time: {violations_summary.get('end_time', 'N/A')}
+Total Violations: {total_violations}
+Total Strikes: {total_strikes}
+Start Time: {start_time}
+End Time: {end_time}
 
 Rules Defined by Manager:
-- Max Accepted Yaw (head pose left/right): 20 degrees
-- Max Accepted Pitch (head pose up/down): 20 degrees
-- Gaze sensitivity limits: 0.025 to 0.055
+{rules}
 
 Transcript:
-{transcript_text}
+{transcript}
 
 Provide a clear, detailed, and professional analysis explaining:
-1. Candidate compliance behaviors, listing specific violation patterns if any.
-2. An evaluation of candidate's answers in relation to the questions asked.
-3. Final recommendation regarding compliance/integrity.
+1. Candidate compliance behaviors.
+2. Evaluation of answers in relation to questions.
+3. Final integrity recommendation.
 
-CRITICAL: Do NOT use markdown headers or formatting like '##' or '**'. Instead, use CAPITALIZED plain text headers and clear spacing.
-"""
-    if not settings.groq_api_key:
-        return "GROQ API key is not configured. Compliance analysis unavailable. Mock Analysis: Candidate showed general compliance throughout the interview."
+CRITICAL: Do NOT use markdown headers or formatting like '##' or '**'. Use CAPITALIZED plain text headers.""")
+        ])
+        
+        try:
+            chain = prompt_template | self.llm
+            response = await chain.ainvoke({
+                "candidate_id": candidate_id,
+                "total_violations": violations_summary.get('total_violations', 0),
+                "total_strikes": violations_summary.get('total_strikes', 0),
+                "start_time": violations_summary.get('start_time', 'N/A'),
+                "end_time": violations_summary.get('end_time', 'N/A'),
+                "rules": rules,
+                "transcript": transcript_text
+            })
+            cleaned = response.content.replace("**", "").replace("##", "").replace("#", "")
+            return cleaned
+        except Exception as e:
+            return f"Analysis generation failed: {e}"
 
-    client = AsyncGroq(api_key=settings.groq_api_key)
-    try:
-        response = await client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="llama-3.1-8b-instant"
-        )
-        # Clean up any remaining markdown characters just in case
-        cleaned_content = response.choices[0].message.content.replace("**", "").replace("##", "").replace("#", "")
-        return cleaned_content
-    except Exception as e:
-        return f"Analysis generation failed: {e}"
+# Facade functions matching existing codebase API signature
+async def generate_agent_response(candidate_id: str, candidate_text: str) -> dict:
+    agent = InterviewAgent()
+    return await agent.get_response(candidate_id, candidate_text)
+
+async def generate_compliance_analysis(candidate_id: str, violations_summary: dict) -> str:
+    agent = ComplianceAnalystAgent()
+    return await agent.analyze(candidate_id, violations_summary)

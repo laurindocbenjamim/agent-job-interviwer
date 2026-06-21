@@ -24,17 +24,37 @@ jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 @router.get("/interview/{candidate_id}", response_class=HTMLResponse)
 async def serve_interview_console(candidate_id: str):
     """Serves the dashboard HTML page with injected configuration."""
+    from src.shared.postgres_db import get_postgres_config
+    config = await get_postgres_config(candidate_id)
+    if config:
+        duration_mins = config.interview_duration_minutes
+        gender = config.avatar_gender.lower()
+        time_limit = config.question_time_limit_seconds
+        is_active = config.is_active
+        speech_lang = config.speech_language
+        text_lang = config.text_language
+    else:
+        duration_mins = settings.interview_duration_minutes
+        gender = settings.avatar_gender.lower()
+        time_limit = settings.question_time_limit_seconds
+        is_active = True
+        speech_lang = "en-US"
+        text_lang = "en"
+
     try:
         template = jinja_env.get_template("interview.html")
     except Exception:
         raise HTTPException(status_code=404, detail="Template file not found")
 
     rendered = template.render(
-        interview_duration_minutes=settings.interview_duration_minutes,
+        interview_duration_minutes=duration_mins,
         total_user_attempt=settings.total_user_attempt,
-        avatar_gender=settings.avatar_gender.lower(),
+        avatar_gender=gender,
         agent_speech_speed=settings.agent_speech_speed,
-        question_time_limit_seconds=settings.question_time_limit_seconds,
+        question_time_limit_seconds=time_limit,
+        is_active=is_active,
+        speech_language=speech_lang,
+        text_language=text_lang
     )
     return HTMLResponse(content=rendered)
 
@@ -73,6 +93,16 @@ async def get_violations_report(candidate_id: str):
         result["end_time"] = end_val.decode() if isinstance(end_val, bytes) else end_val
     except Exception:
         result["end_time"] = None
+    
+    from src.domains.interviews.agent import _sessions
+    from src.shared.database import get_interview_session
+    try:
+        transcript = _sessions.get(candidate_id, [])
+        if not transcript:
+            transcript = await get_interview_session(candidate_id)
+    except Exception:
+        transcript = []
+    result["transcript"] = transcript
     
     from src.domains.interviews.agent import generate_compliance_analysis
     result["compliance_analysis"] = await generate_compliance_analysis(candidate_id, result)

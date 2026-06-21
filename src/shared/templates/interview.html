@@ -6,8 +6,8 @@
     <title>AI Interview Console</title>
     <meta name="description" content="AI-powered interview monitoring with gaze tracking and compliance verification">
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <script src="https://unpkg.com/three@0.149.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three@0.149.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://unpkg.com/@pixiv/three-vrm@1.0.9/lib/three-vrm.min.js"></script>
     <style>
         {% include 'styles.css' %}
@@ -256,6 +256,12 @@
                 <div class="audio-meter-bar" style="margin-top: 1rem;">
                     <div id="audio-meter-fill" class="audio-meter-fill"></div>
                 </div>
+                
+                {% if not is_active %}
+                <div style="background: rgba(239, 68, 68, 0.1); border: 1px solid #ef4444; border-radius: 0.75rem; padding: 1rem; color: #f87171; text-align: center; margin-top: 1.5rem; font-weight: 600; font-size: 0.95rem;">
+                    ⚠️ This interview session is currently INACTIVE. Please contact the manager to activate it.
+                </div>
+                {% endif %}
                 
                 <div class="btn-center" style="margin-top: 2rem;">
                     <button id="btn-start" class="btn btn-primary" disabled onclick="startInterview()">

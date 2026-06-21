@@ -6,9 +6,9 @@
 let questionTimerInterval = null;
 const QUESTION_LIMIT = parseInt('{{ question_time_limit_seconds }}') || 60;
 
-function startQuestionTimer() {
+function startQuestionTimer(customLimit = null) {
     if (questionTimerInterval) clearInterval(questionTimerInterval);
-    State.remainingSeconds = QUESTION_LIMIT;
+    State.remainingSeconds = customLimit !== null ? customLimit : QUESTION_LIMIT;
     updateTimerDisplay();
 
     const btnSubmit = $('btn-submit-answer');
@@ -49,10 +49,10 @@ async function submitAnswer(isAutoTimeout = false) {
             if (textEl) textEl.textContent = "I can't hear you. Let's move to the next question.";
             if (typeof playAgentSpeech === 'function') {
                 playAgentSpeech("I can't hear you. Let's move to the next question.", async () => {
-                    await sendSubmit("[Candidate did not speak]");
+                    await sendSubmit("Question not answered");
                 });
             } else {
-                await sendSubmit("[Candidate did not speak]");
+                await sendSubmit("Question not answered");
             }
             return;
         } else {
@@ -71,7 +71,12 @@ async function submitAnswer(isAutoTimeout = false) {
             const vals = Array.from(checked).map(el => el.value);
             if (vals.length > 0) answerText = vals.join(', ');
         } else {
-            answerText = "[Candidate answered via voice]";
+            // voice input
+            if (!State.hasSpoken) {
+                answerText = "Question not answered";
+            } else {
+                answerText = "[Candidate answered via voice]";
+            }
         }
     }
 
@@ -108,13 +113,14 @@ async function sendSubmit(answerText) {
         State.hasSpoken = false;
 
         // Play audio via Web Speech API and animate avatar
+        const dynamicLimit = data.question_time_limit || null;
         if (typeof playAgentSpeech === 'function') {
             playAgentSpeech(data.text_to_speak, () => {
                 // Restart timer once agent finishes speaking
-                startQuestionTimer();
+                startQuestionTimer(dynamicLimit);
             });
         } else {
-            startQuestionTimer();
+            startQuestionTimer(dynamicLimit);
         }
 
     } catch (err) {

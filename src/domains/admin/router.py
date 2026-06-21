@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 from fastapi import APIRouter, UploadFile, File, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import shutil
@@ -86,20 +87,11 @@ async def update_cv_settings(candidate_id: str, settings: CVSettings):
 
 @router.post("/voice/clone")
 async def clone_voice(file: UploadFile = File(...)):
-    """Accepts an audio file upload and saves it to be used as a reference for Coqui TTS XTTS-v2."""
     if not file.content_type.startswith("audio/"):
-        raise HTTPException(status_code=400, detail="Uploaded file must be an audio file.")
-        
+        raise HTTPException(400, "Uploaded file must be an audio file.")
     os.makedirs(VOICE_DIR, exist_ok=True)
-    
-    file_location = os.path.join(VOICE_DIR, "cloned_voice.wav")
-    
-    try:
-        with open(file_location, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save audio file: {str(e)}")
-        
+    with open(os.path.join(VOICE_DIR, "cloned_voice.wav"), "wb") as f:
+        shutil.copyfileobj(file.file, f)
     return {"status": "success", "message": "Voice cloned successfully.", "filename": file.filename}
 
 class InjectedQuestion(BaseModel):
@@ -111,3 +103,94 @@ async def inject_question(candidate_id: str, payload: InjectedQuestion):
     from src.domains.interviews.agent import queue_injected_question
     queue_injected_question(candidate_id, payload.question)
     return {"status": "success", "message": "Question queued successfully."}
+
+class InterviewConfigSchema(BaseModel):
+    interview_duration_minutes: int
+    avatar_gender: str
+    question_time_limit_seconds: int
+    num_questions: int
+    interview_objective: str
+    interview_topics: str
+    speech_language: str
+    text_language: str
+    candidate_name: Optional[str] = None
+    job_specialty: Optional[str] = None
+    is_active: bool
+
+DEFAULTS = {
+    "interview_duration_minutes": 30, "avatar_gender": "female", "question_time_limit_seconds": 60,
+    "num_questions": 5, "interview_objective": "Assess engineering skills and culture fit.",
+    "interview_topics": "Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines",
+    "speech_language": "en-US", "text_language": "en", "candidate_name": "", "job_specialty": "", "is_active": True
+}
+
+@router.get("/config/{candidate_id}")
+async def get_candidate_config(candidate_id: str):
+    """Fetches the candidate configuration from Postgres, or defaults if not set."""
+    from src.shared.postgres_db import get_postgres_config
+    config = await get_postgres_config(candidate_id)
+    if not config:
+        return DEFAULTS
+    return {k: getattr(config, k, DEFAULTS[k]) or "" for k in DEFAULTS}
+
+@router.post("/config/{candidate_id}")
+async def update_candidate_config(candidate_id: str, payload: InterviewConfigSchema):
+    """Updates candidate configuration in Postgres."""
+    from src.shared.postgres_db import save_postgres_config
+    config = await save_postgres_config(candidate_id, payload.model_dump())
+    return {"status": "success", "message": "Configuration updated successfully"}
+
+import uuid
+from typing import Optional
+
+class CreateCandidateSchema(BaseModel):
+    name: str
+    job_specialty: str
+
+@router.post("/candidate/create")
+async def create_candidate(payload: CreateCandidateSchema):
+    """Creates a new candidate with an automatically generated UUID."""
+    from src.shared.postgres_db import save_postgres_config
+    candidate_uuid = str(uuid.uuid4())
+    
+    default_config = {
+        "interview_duration_minutes": 30,
+        "avatar_gender": "female",
+        "question_time_limit_seconds": 60,
+        "num_questions": 5,
+        "interview_objective": f"Assess engineering skills and culture fit for a {payload.job_specialty} role.",
+        "interview_topics": f"Experience with {payload.job_specialty},FastAPI and Async Python,System design concepts",
+        "speech_language": "en-US",
+        "text_language": "en",
+        "candidate_name": payload.name,
+        "job_specialty": payload.job_specialty,
+        "is_active": True
+    }
+    
+    await save_postgres_config(candidate_uuid, default_config)
+    return {
+        "status": "success",
+        "candidate_id": candidate_uuid,
+        "candidate_name": payload.name,
+        "job_specialty": payload.job_specialty
+    }
+
+@router.get("/candidates")
+async def get_all_candidates():
+    """Returns a list of all candidate configurations from Postgres."""
+    from src.shared.postgres_db import get_all_postgres_configs
+    configs = await get_all_postgres_configs()
+    return [{
+        "candidate_id": c.candidate_id,
+        "candidate_name": c.candidate_name or "",
+        "job_specialty": c.job_specialty or "",
+        "is_active": c.is_active,
+        "num_questions": c.num_questions,
+        "interview_duration_minutes": c.interview_duration_minutes
+    } for c in configs]
+
+@router.get("/candidates-directory", response_class=HTMLResponse)
+async def candidates_directory():
+    """Serves the candidates directory HTML page."""
+    return HTMLResponse(content=jinja_env.get_template("admin_candidates.html").render())
+

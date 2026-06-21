@@ -391,9 +391,15 @@
                 </svg>
             </button>
         </div>
-        <div class="sidebar-action" style="padding: 1rem; border-bottom: 1px solid var(--glass-border); display: flex; justify-content: center; width: 100%;">
+        <div class="sidebar-action" style="padding: 1rem; border-bottom: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 0.5rem; justify-content: center; width: 100%;">
             <button class="action-btn" onclick="openSessionsPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
                 <span>📋</span> <span class="sidebar-btn-text">Active Status</span>
+            </button>
+            <button class="action-btn" onclick="window.location.href='/admin/candidates-directory'" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <span>👥</span> <span class="sidebar-btn-text">All Candidates</span>
+            </button>
+            <button class="action-btn" onclick="openConfigPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+                <span>⚙️</span> <span class="sidebar-btn-text">Configure Interview</span>
             </button>
         </div>
         <div class="sessions-list" id="sessions-list">
@@ -455,9 +461,12 @@
                         <span class="metric-label">Video Integrity</span>
                         <span id="m-quality" class="badge ok">Awaiting</span>
                     </div>
-                    <div class="metric-row" id="print-row" style="display: none; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1rem; justify-content: center; width: 100%;">
-                        <button onclick="printInterviewReport()" class="btn-print" style="width: 100%; padding: 0.75rem 1.5rem; border-radius: 12px; border: 1px solid var(--accent-blue); background: rgba(59, 130, 246, 0.1); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onmouseover="this.style.background='var(--accent-blue)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.1)'">
-                            🖨️ Print Interview Report
+                    <div class="metric-row" id="print-row" style="display: none; padding-top: 1.5rem; border-top: 1px solid rgba(255, 255, 255, 0.08); margin-top: 1rem; flex-direction: column; gap: 0.75rem; width: 100%;">
+                        <button onclick="printIntegrityReport()" class="btn-print" style="width: 100%; padding: 0.75rem 1.5rem; border-radius: 12px; border: 1px solid var(--accent-blue); background: rgba(59, 130, 246, 0.1); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onmouseover="this.style.background='var(--accent-blue)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.1)'">
+                            📋 Print Integrity &amp; Rules Report
+                        </button>
+                        <button onclick="printQAReport()" class="btn-print" style="width: 100%; padding: 0.75rem 1.5rem; border-radius: 12px; border: 1px solid var(--accent-green); background: rgba(16, 185, 129, 0.1); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onmouseover="this.style.background='var(--accent-green)'" onmouseout="this.style.background='rgba(16, 185, 129, 0.1)'">
+                            💬 Print Q&amp;A Report
                         </button>
                     </div>
                 </div>
@@ -749,7 +758,7 @@
             }
         }
 
-        async function printInterviewReport() {
+        async function printIntegrityReport() {
             if (!activeSessionId) {
                 alert("No active session selected.");
                 return;
@@ -761,7 +770,6 @@
                 }
                 const data = await res.json();
                 
-                // Construct print-friendly HTML content
                 const reportWindow = window.open('', '_blank');
                 let eventsHtml = '';
                 if (data.events && data.events.length > 0) {
@@ -779,15 +787,11 @@
                     eventsHtml = '<tr><td colspan="4" class="no-violations">No compliance violations recorded. Candidate remained focused!</td></tr>';
                 }
 
-                // Clean up compliance analysis markdown characters (## and **)
-                let cleanedAnalysis = data.compliance_analysis || "No compliance analysis available.";
-                cleanedAnalysis = cleanedAnalysis.replace(/\*\*/g, '').replace(/##/g, '').replace(/#/g, '');
-
                 const printHtml = `
                     <!DOCTYPE html>
                     <html>
                     <head>
-                        <title>Interview Compliance Report - ${data.candidate_id}</title>
+                        <title>Integrity &amp; Rules Report - ${data.candidate_id}</title>
                         <style>
                             body {
                                 font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -891,16 +895,6 @@
                                 padding-bottom: 8px;
                                 margin: 30px 0 15px 0;
                             }
-                            .analysis-text {
-                                background: #f8fafc;
-                                border: 1px solid #e2e8f0;
-                                border-radius: 8px;
-                                padding: 20px;
-                                white-space: pre-wrap;
-                                font-size: 14px;
-                                color: #334155;
-                                line-height: 1.6;
-                            }
                             table {
                                 width: 100%;
                                 border-collapse: collapse;
@@ -942,7 +936,7 @@
                             <div class="header-title-row">
                                 <div class="app-info">
                                     <h1>AI-Monitored Job Interview System</h1>
-                                    <p>Candidate Compliance &amp; Integrity Report</p>
+                                    <p>Candidate Compliance &amp; Integrity Report (CV &amp; Rules)</p>
                                 </div>
                                 <div class="company-info">
                                     <h2>Compliance Monitoring Corp</h2>
@@ -985,10 +979,7 @@
                             </div>
                         </div>
 
-                        <div class="section-title">Specialist Compliance Analysis</div>
-                        <div class="analysis-text">${cleanedAnalysis}</div>
-
-                        <div class="section-title">Detailed Violation Timeline</div>
+                        <div class="section-title">Detailed Violation Timeline &amp; Rules Checked</div>
                         <table>
                             <thead>
                                 <tr>
@@ -1010,14 +1001,214 @@
                 reportWindow.document.close();
                 reportWindow.focus();
                 
-                // Wait for styles/rendering to load before opening print dialog
                 setTimeout(() => {
                     reportWindow.print();
                 }, 500);
 
             } catch (err) {
                 console.error(err);
-                alert("Failed to print interview report: " + err.message);
+                alert("Failed to print integrity report: " + err.message);
+            }
+        }
+
+        async function printQAReport() {
+            if (!activeSessionId) {
+                alert("No active session selected.");
+                return;
+            }
+            try {
+                const res = await fetch(`/interview/${activeSessionId}/violations`);
+                if (!res.ok) {
+                    throw new Error("Unable to retrieve Q&A report.");
+                }
+                const data = await res.json();
+                
+                const reportWindow = window.open('', '_blank');
+                
+                let transcriptHtml = '';
+                if (data.transcript && data.transcript.length > 0) {
+                    let lastQuestion = '';
+                    data.transcript.forEach(msg => {
+                        if (msg.role === 'system') return; // Skip system prompts
+                        if (msg.role === 'assistant') {
+                            let text = msg.content;
+                            try {
+                                const parsed = JSON.parse(msg.content);
+                                text = parsed.text_to_speak || msg.content;
+                            } catch (e) {}
+                            if (text && !text.includes('You are an expert AI Job Interviewer')) {
+                                lastQuestion = text;
+                            }
+                        } else if (msg.role === 'user') {
+                            transcriptHtml += `
+                                <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #e2e8f0; border-radius: 8px; background: #f8fafc;">
+                                    <div style="font-weight: 700; color: #1e3a8a; margin-bottom: 5px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Question:</div>
+                                    <div style="color: #334155; margin-bottom: 12px; font-size: 14px;">${lastQuestion || 'Initial Greeting / Setup'}</div>
+                                    <div style="font-weight: 700; color: #10b981; margin-bottom: 5px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px;">Candidate Answer:</div>
+                                    <div style="color: #1e293b; font-style: italic; font-size: 14px;">${msg.content}</div>
+                                </div>
+                            `;
+                            lastQuestion = '';
+                        }
+                    });
+                }
+                if (!transcriptHtml) {
+                    transcriptHtml = '<p style="color:#64748b; font-style:italic;">No interview questions and answers recorded.</p>';
+                }
+
+                // Clean up compliance analysis markdown characters (## and **)
+                let cleanedAnalysis = data.compliance_analysis || "No compliance analysis available.";
+                cleanedAnalysis = cleanedAnalysis.replace(/\*\*/g, '').replace(/##/g, '').replace(/#/g, '');
+
+                const printHtml = `
+                    <!DOCTYPE html>
+                    <html>
+                    <head>
+                        <title>Questions &amp; Answers Report - ${data.candidate_id}</title>
+                        <style>
+                            body {
+                                font-family: 'Helvetica Neue', Arial, sans-serif;
+                                color: #1e293b;
+                                padding: 40px;
+                                line-height: 1.5;
+                            }
+                            .header {
+                                border-bottom: 2px solid #e2e8f0;
+                                padding-bottom: 20px;
+                                margin-bottom: 30px;
+                            }
+                            .header-title-row {
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: flex-start;
+                                margin-bottom: 15px;
+                            }
+                            .app-info h1 {
+                                font-size: 24px;
+                                margin: 0;
+                                color: #0f172a;
+                            }
+                            .app-info p {
+                                font-size: 14px;
+                                margin: 2px 0 0 0;
+                                color: #64748b;
+                                font-weight: 500;
+                            }
+                            .company-info {
+                                text-align: right;
+                            }
+                            .company-info h2 {
+                                font-size: 16px;
+                                margin: 0;
+                                color: #10b981;
+                            }
+                            .company-info p {
+                                font-size: 12px;
+                                margin: 2px 0 0 0;
+                                color: #64748b;
+                            }
+                            .meta-grid {
+                                display: grid;
+                                grid-template-columns: repeat(2, 1fr);
+                                gap: 10px;
+                                margin-top: 15px;
+                                background: #f8fafc;
+                                padding: 15px;
+                                border-radius: 8px;
+                                border: 1px solid #e2e8f0;
+                                font-size: 14px;
+                            }
+                            .meta-item {
+                                display: flex;
+                                justify-content: space-between;
+                                padding: 4px 0;
+                            }
+                            .meta-item span.label {
+                                color: #64748b;
+                                font-weight: 500;
+                            }
+                            .meta-item span.value {
+                                color: #0f172a;
+                                font-weight: 600;
+                            }
+                            .section-title {
+                                font-size: 18px;
+                                color: #0f172a;
+                                border-bottom: 1px solid #e2e8f0;
+                                padding-bottom: 8px;
+                                margin: 30px 0 15px 0;
+                            }
+                            .analysis-text {
+                                background: #f8fafc;
+                                border: 1px solid #e2e8f0;
+                                border-radius: 8px;
+                                padding: 20px;
+                                white-space: pre-wrap;
+                                font-size: 14px;
+                                color: #334155;
+                                line-height: 1.6;
+                            }
+                            @media print {
+                                body { padding: 0; }
+                                .no-print { display: none; }
+                            }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div class="header-title-row">
+                                <div class="app-info">
+                                    <h1>AI-Monitored Job Interview System</h1>
+                                    <p>Candidate Compliance &amp; Integrity Report (Q&amp;A)</p>
+                                </div>
+                                <div class="company-info">
+                                    <h2>Compliance Monitoring Corp</h2>
+                                    <p>Security &amp; Integrity Audit</p>
+                                </div>
+                            </div>
+                            
+                            <div class="meta-grid">
+                                <div class="meta-item">
+                                    <span class="label">Candidate ID:</span>
+                                    <span class="value">${data.candidate_id}</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="label">Report Date:</span>
+                                    <span class="value">${new Date().toLocaleDateString()}</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="label">Start Time:</span>
+                                    <span class="value">${data.start_time || 'N/A'}</span>
+                                </div>
+                                <div class="meta-item">
+                                    <span class="label">End Time:</span>
+                                    <span class="value">${data.end_time || 'N/A'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="section-title">Specialist Compliance Analysis &amp; QA Feedback</div>
+                        <div class="analysis-text">${cleanedAnalysis}</div>
+
+                        <div class="section-title">Questions &amp; Candidate Answers Transcript</div>
+                        <div style="margin-top: 15px;">
+                            ${transcriptHtml}
+                        </div>
+                    </body>
+                    </html>
+                `;
+                
+                reportWindow.document.write(printHtml);
+                reportWindow.document.close();
+                reportWindow.focus();
+                
+                setTimeout(() => {
+                    reportWindow.print();
+                }, 500);
+
+            } catch (err) {
+                console.error(err);
+                alert("Failed to print Q&A report: " + err.message);
             }
         }
 
@@ -1087,8 +1278,240 @@
             selectSession(candidateId);
         }
 
+        function openUsersPopup() {
+            const modal = document.getElementById('users-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.opacity = '1';
+            }, 10);
+            document.getElementById('create-user-name').value = '';
+            document.getElementById('create-user-specialty').value = 'Backend Engineer';
+            document.getElementById('create-user-result').style.display = 'none';
+            loadAllCandidates();
+        }
+
+        function closeUsersPopup() {
+            const modal = document.getElementById('users-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        async function loadAllCandidates() {
+            try {
+                const res = await fetch('/admin/candidates');
+                if (!res.ok) throw new Error("Failed to load candidates");
+                const candidates = await res.json();
+                
+                const container = document.getElementById('modal-users-content');
+                if (!candidates || candidates.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 2rem;">No candidate profiles found. Use the form above to create one.</div>';
+                    return;
+                }
+                
+                let html = `
+                    <table style="width:100%; border-collapse:collapse; margin-top:1rem; font-size:0.9rem;">
+                        <thead>
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Name</th>
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Job Specialty</th>
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Duration</th>
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Questions</th>
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Status</th>
+                                <th style="padding:10px; color:var(--text-secondary); font-weight:600; text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+                
+                candidates.forEach(c => {
+                    const statusClass = c.is_active ? 'ok' : 'danger';
+                    const statusText = c.is_active ? 'Active' : 'Inactive';
+                    html += `
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                            <td style="padding:12px 10px; font-weight:500;">${c.candidate_name || 'N/A'}</td>
+                            <td style="padding:12px 10px; color:var(--text-secondary);">${c.job_specialty || 'N/A'}</td>
+                            <td style="padding:12px 10px;">${c.interview_duration_minutes} min</td>
+                            <td style="padding:12px 10px;">${c.num_questions} Qs</td>
+                            <td style="padding:12px 10px;"><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td style="padding:12px 10px; text-align:right; display:flex; gap:0.5rem; justify-content:flex-end; align-items:center;">
+                                <a href="/interview/${c.candidate_id}" target="_blank" style="padding:0.4rem 0.8rem; border-radius:8px; background:rgba(59, 130, 246, 0.1); border:1px solid var(--accent-blue); color:var(--text-primary); text-decoration:none; font-weight:600; font-size:0.8rem; cursor:pointer;" onmouseover="this.style.background='var(--accent-blue)'" onmouseout="this.style.background='rgba(59, 130, 246, 0.1)'">Console 🔗</a>
+                                <button onclick="configureFromUsersList('${c.candidate_id}')" style="padding:0.4rem 0.8rem; border-radius:8px; border:none; background:var(--accent-green); color:white; font-weight:600; font-size:0.8rem; cursor:pointer; transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Configure ⚙️</button>
+                                <button onclick="monitorFromUsersList('${c.candidate_id}')" style="padding:0.4rem 0.8rem; border-radius:8px; border:none; background:var(--accent-blue); color:white; font-weight:600; font-size:0.8rem; cursor:pointer; transition:opacity 0.2s;" onmouseover="this.style.opacity='0.8'" onmouseout="this.style.opacity='1'">Monitor 👁️</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+                
+                html += '</tbody></table>';
+                container.innerHTML = html;
+                
+            } catch (e) {
+                console.error("Failed to load candidates list", e);
+                document.getElementById('modal-users-content').innerHTML = '<div style="color:var(--accent-red); text-align:center; padding:2rem;">Failed to load candidates.</div>';
+            }
+        }
+
+        function configureFromUsersList(candidateId) {
+            closeUsersPopup();
+            const modal = document.getElementById('config-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.opacity = '1';
+            }, 10);
+            document.getElementById('config-candidate-id').value = candidateId;
+            loadConfigForCandidate(candidateId);
+        }
+
+        function monitorFromUsersList(candidateId) {
+            closeUsersPopup();
+            selectSession(candidateId);
+        }
+
+        async function createCandidateUser() {
+            const name = document.getElementById('create-user-name').value.trim();
+            const specialty = document.getElementById('create-user-specialty').value.trim();
+            if (!name || !specialty) {
+                alert("Please fill in both fields.");
+                return;
+            }
+            
+            try {
+                const res = await fetch('/admin/candidate/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, job_specialty: specialty })
+                });
+                
+                if (!res.ok) throw new Error("Failed to create candidate");
+                const data = await res.json();
+                
+                const resultDiv = document.getElementById('create-user-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 12px; padding: 1rem; color: #a7f3d0; margin-top: 0.5rem; margin-bottom: 0.5rem; line-height: 1.6; font-size: 0.85rem;">
+                        <strong>Candidate Created Successfully!</strong><br>
+                        <strong>UUID / Candidate ID:</strong> <span style="font-family: monospace; color: var(--accent-blue); word-break: break-all;">${data.candidate_id}</span><br>
+                        <a href="/interview/${data.candidate_id}" target="_blank" style="color: var(--accent-green); font-weight: 600; text-decoration: underline;">Open Candidate Interview Console 🔗</a>
+                    </div>
+                `;
+                
+                logEvent(`Created candidate ${data.candidate_name} with UUID ${data.candidate_id}`, 'info');
+                loadAllCandidates();
+                fetchSessions();
+            } catch (e) {
+                console.error("Failed to create candidate", e);
+                logEvent(`Failed to create candidate`, 'error');
+                alert("Failed to create candidate.");
+            }
+        }
+
+        function openConfigPopup() {
+            const modal = document.getElementById('config-modal');
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.style.opacity = '1';
+            }, 10);
+            
+            const input = document.getElementById('config-candidate-id');
+            if (activeSessionId) {
+                input.value = activeSessionId;
+                loadConfigForCandidate(activeSessionId);
+            } else {
+                input.value = '';
+                document.getElementById('config-is-active').checked = true;
+                document.getElementById('config-duration').value = 30;
+                document.getElementById('config-gender').value = 'female';
+                document.getElementById('config-time-limit').value = 60;
+                document.getElementById('config-num-questions').value = 5;
+                document.getElementById('config-objective').value = 'Assess engineering skills and culture fit.';
+                document.getElementById('config-topics').value = 'Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines';
+                document.getElementById('config-speech-lang').value = 'en-US';
+                document.getElementById('config-text-lang').value = 'en';
+            }
+        }
+
+        function closeConfigPopup() {
+            const modal = document.getElementById('config-modal');
+            modal.style.opacity = '0';
+            setTimeout(() => {
+                modal.style.display = 'none';
+            }, 300);
+        }
+
+        async function loadConfigForCandidate(id) {
+            const candidateId = id || document.getElementById('config-candidate-id').value.trim();
+            if (!candidateId) return;
+            try {
+                const res = await fetch(`/admin/config/${candidateId}`);
+                if (!res.ok) throw new Error("Failed to load config");
+                const config = await res.json();
+                
+                document.getElementById('config-is-active').checked = config.is_active;
+                document.getElementById('config-duration').value = config.interview_duration_minutes;
+                document.getElementById('config-gender').value = config.avatar_gender;
+                document.getElementById('config-time-limit').value = config.question_time_limit_seconds;
+                document.getElementById('config-num-questions').value = config.num_questions;
+                document.getElementById('config-objective').value = config.interview_objective;
+                document.getElementById('config-topics').value = config.interview_topics;
+                document.getElementById('config-speech-lang').value = config.speech_language;
+                document.getElementById('config-text-lang').value = config.text_language;
+                
+                logEvent(`Loaded configurations for candidate ${candidateId}`, 'info');
+            } catch (e) {
+                console.error("Failed to load config", e);
+                logEvent(`Failed to load config for candidate ${candidateId}`, 'error');
+            }
+        }
+
+        async function saveConfigForCandidate() {
+            const candidateId = document.getElementById('config-candidate-id').value.trim();
+            if (!candidateId) {
+                alert("Please enter a Candidate ID/UUID.");
+                return;
+            }
+            
+            const payload = {
+                interview_duration_minutes: parseInt(document.getElementById('config-duration').value),
+                avatar_gender: document.getElementById('config-gender').value,
+                question_time_limit_seconds: parseInt(document.getElementById('config-time-limit').value),
+                num_questions: parseInt(document.getElementById('config-num-questions').value),
+                interview_objective: document.getElementById('config-objective').value,
+                interview_topics: document.getElementById('config-topics').value,
+                speech_language: document.getElementById('config-speech-lang').value,
+                text_language: document.getElementById('config-text-lang').value,
+                is_active: document.getElementById('config-is-active').checked
+            };
+            
+            try {
+                const res = await fetch(`/admin/config/${candidateId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!res.ok) throw new Error("Failed to save config");
+                
+                logEvent(`Saved configurations for candidate ${candidateId}`, 'info');
+                alert("Configurations saved successfully!");
+                closeConfigPopup();
+                fetchSessions();
+            } catch (e) {
+                console.error("Failed to save config", e);
+                logEvent(`Failed to save config for candidate ${candidateId}`, 'error');
+                alert("Failed to save configurations.");
+            }
+        }
+
         // Init
-        fetchSessions();
+        fetchSessions().then(() => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const monitorId = urlParams.get('monitor');
+            if (monitorId) {
+                selectSession(monitorId);
+            }
+        });
         setInterval(fetchSessions, 5000);
     </script>
     
@@ -1106,6 +1529,97 @@
                 <!-- Session items listed here -->
             </div>
         </div>
+    </div>
+
+    <!-- Beautiful Configuration Modal -->
+    <div id="config-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div class="glass-card" style="width: 650px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.9);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
+                    <span>⚙️</span> Candidate Interview Configurator
+                </h2>
+                <button onclick="closeConfigPopup()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1.2rem; font-size: 0.95rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Candidate ID / User UUID</label>
+                        <input type="text" id="config-candidate-id" placeholder="e.g. candidate_123" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                    </div>
+                    <button onclick="loadConfigForCandidate()" style="padding:0.6rem 1.2rem; border-radius:10px; border:none; background:var(--accent-blue); color:white; font-weight:600; cursor:pointer;">Load Config</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0;">
+                    <label style="color:var(--text-primary); font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.5rem;">
+                        <input type="checkbox" id="config-is-active" style="width:18px; height:18px; accent-color:var(--accent-green);" checked>
+                        Interview Session Active
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Duration (mins)</label>
+                        <input type="number" id="config-duration" value="30" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Avatar Gender</label>
+                        <select id="config-gender" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Question Time Limit (secs)</label>
+                        <input type="number" id="config-time-limit" value="60" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Number of Questions</label>
+                        <input type="number" id="config-num-questions" value="5" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Objective</label>
+                    <textarea id="config-objective" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Assess engineering skills and culture fit.</textarea>
+                </div>
+
+                <div>
+                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Topics (comma-separated)</label>
+                    <textarea id="config-topics" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines</textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Speech Language</label>
+                        <select id="config-speech-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="en-US">English (US)</option>
+                            <option value="es-ES">Spanish (Spain)</option>
+                            <option value="fr-FR">French (France)</option>
+                            <option value="pt-BR">Portuguese (Brazil)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Text / Question Language</label>
+                        <select id="config-text-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="pt">Portuguese</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button onclick="closeConfigPopup()" style="padding:0.75rem 1.5rem; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--text-primary); font-weight:600; cursor:pointer;">Cancel</button>
+                    <button onclick="saveConfigForCandidate()" style="padding:0.75rem 1.5rem; border-radius:10px; border:none; background:var(--accent-green); color:white; font-weight:600; cursor:pointer;">Save Configurations</button>
+                </div>
+            </div>
+        </div>
+    </div>
     </div>
 </body>
 </html>

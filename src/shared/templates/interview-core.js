@@ -197,7 +197,8 @@ function updateEnvCheck(type, ok) {
 
 function checkPreviewReady() {
     const btn = $('btn-start');
-    if (btn) btn.disabled = !State.localStream;
+    const isActive = '{{ is_active }}' === 'True';
+    if (btn) btn.disabled = !State.localStream || !isActive;
 }
 
 /* ─── WebSocket ─── */
@@ -316,7 +317,14 @@ function initAvatar() {
             });
         },
         (progress) => console.log('Loading avatar...', 100.0 * (progress.loaded / progress.total), '%'),
-        (error) => console.error(error)
+        (error) => {
+            console.error('[Avatar Load Error]', error);
+            const loadingEl = $('avatar-loading');
+            if (loadingEl) {
+                loadingEl.textContent = 'AI Avatar Offline (Voice Mode Active)';
+                loadingEl.style.color = 'var(--text-muted)';
+            }
+        }
     );
 
     function animate() {

@@ -34,3 +34,14 @@ async def save_interview_session(candidate_id: str, session_data: list) -> None:
         "transcript": session_data
     }
     await logs_collection.insert_one(document)
+
+async def get_interview_session(candidate_id: str) -> list:
+    """Retrieves the final interview transcript session from MongoDB."""
+    document = await logs_collection.find_one(
+        {"candidate_id": candidate_id, "event_type": "interview_finalized"},
+        {"_id": 0}
+    )
+    if document:
+        return document.get("transcript", [])
+    return []
+

@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Candidate Directory - Admin Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: #000000;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2.5rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 1.5rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .back-btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            padding: 2rem;
+        }
+
+        /* Form styling */
+        .form-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .form-grid {
+            display: flex;
+            gap: 1rem;
+            align-items: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.4rem;
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            outline: none;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: border-color 0.2s;
+        }
+
+        .form-group input:focus {
+            border-color: var(--accent-blue);
+        }
+
+        .submit-btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            background: var(--accent-green);
+            color: white;
+            font-weight: 600;
+            font-size: 0.95rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .submit-btn:hover {
+            opacity: 0.9;
+        }
+
+        /* Table styling */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 0.5rem;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        th {
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tr:hover td {
+            background: rgba(255, 255, 255, 0.01);
+        }
+
+        .badge {
+            padding: 0.3rem 0.75rem;
+            border-radius: 999px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            display: inline-block;
+        }
+
+        .badge.ok {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge.danger {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .action-link, .action-btn {
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.8rem;
+            cursor: pointer;
+            text-decoration: none;
+            font-family: inherit;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .action-link.console {
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid var(--accent-blue);
+            color: var(--text-primary);
+        }
+
+        .action-link.console:hover {
+            background: var(--accent-blue);
+        }
+
+        .action-btn.monitor {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--accent-green);
+            color: var(--text-primary);
+        }
+
+        .action-btn.monitor:hover {
+            background: var(--accent-green);
+        }
+
+        .actions-cell {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+            align-items: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="header-title">
+                <span>👥</span> Candidate Profiles &amp; Directory
+            </h1>
+            <a href="/admin/dashboard" class="back-btn">
+                <span>🔙</span> Back to Monitor Dashboard
+            </a>
+        </div>
+
+        <!-- Add New Profile Section -->
+        <div class="glass-card">
+            <h2 class="form-title">👤 Add New Candidate Profile</h2>
+            <div class="form-grid">
+                <div class="form-group">
+                    <label for="candidate-name">Candidate Full Name</label>
+                    <input type="text" id="candidate-name" placeholder="e.g. John Doe">
+                </div>
+                <div class="form-group">
+                    <label for="job-specialty">Job Specialty / Title</label>
+                    <input type="text" id="job-specialty" placeholder="e.g. Backend Engineer">
+                </div>
+                <button onclick="createCandidate()" class="submit-btn">Create Profile</button>
+            </div>
+            <div id="create-result" style="display: none;"></div>
+        </div>
+
+        <!-- Directory Directory List -->
+        <div class="glass-card">
+            <h2 class="form-title" style="margin-bottom: 1.5rem;">📋 Candidate Profiles Directory</h2>
+            <div id="candidates-table-container">
+                <div style="color:var(--text-secondary); text-align:center; padding: 2rem;">Loading candidates...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function loadCandidates() {
+            try {
+                const res = await fetch('/admin/candidates');
+                if (!res.ok) throw new Error("Failed to fetch candidates");
+                const candidates = await res.json();
+
+                const container = document.getElementById('candidates-table-container');
+                if (!candidates || candidates.length === 0) {
+                    container.innerHTML = '<div style="color:var(--text-secondary); text-align:center; padding: 2rem;">No candidates profiles found. Use the form above to create one.</div>';
+                    return;
+                }
+
+                let html = `
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Candidate Name</th>
+                                <th>Job Specialty</th>
+                                <th>Duration</th>
+                                <th>Questions</th>
+                                <th>Status</th>
+                                <th style="text-align:right;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                `;
+
+                candidates.forEach(c => {
+                    const statusClass = c.is_active ? 'ok' : 'danger';
+                    const statusText = c.is_active ? 'Active' : 'Inactive';
+                    html += `
+                        <tr>
+                            <td style="font-weight: 500;">${c.candidate_name || 'N/A'}</td>
+                            <td style="color: var(--text-secondary);">${c.job_specialty || 'N/A'}</td>
+                            <td>${c.interview_duration_minutes} min</td>
+                            <td>${c.num_questions} Qs</td>
+                            <td><span class="badge ${statusClass}">${statusText}</span></td>
+                            <td class="actions-cell">
+                                <a href="/interview/${c.candidate_id}" target="_blank" class="action-link console">Console 🔗</a>
+                                <button onclick="monitorCandidate('${c.candidate_id}')" class="action-btn monitor">Monitor 👁️</button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            } catch (e) {
+                console.error("Error loading candidates", e);
+                document.getElementById('candidates-table-container').innerHTML = '<div style="color:var(--accent-red); text-align:center; padding:2rem;">Failed to load candidate profiles.</div>';
+            }
+        }
+
+        async function createCandidate() {
+            const nameInput = document.getElementById('candidate-name');
+            const specialtyInput = document.getElementById('job-specialty');
+            const name = nameInput.value.trim();
+            const specialty = specialtyInput.value.trim();
+
+            if (!name || !specialty) {
+                alert("Please fill in both name and specialty.");
+                return;
+            }
+
+            try {
+                const res = await fetch('/admin/candidate/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name: name, job_specialty: specialty })
+                });
+
+                if (!res.ok) throw new Error("Failed to create candidate");
+                const data = await res.json();
+
+                const resultDiv = document.getElementById('create-result');
+                resultDiv.style.display = 'block';
+                resultDiv.innerHTML = `
+                    <div style="background: rgba(16, 185, 129, 0.1); border: 1px solid var(--accent-green); border-radius: 12px; padding: 1rem; color: #a7f3d0; margin-top: 1rem; line-height: 1.6;">
+                        <strong>Candidate Created Successfully!</strong><br>
+                        <strong>Candidate ID (UUID):</strong> <span style="font-family: monospace; color: var(--accent-blue); word-break: break-all;">${data.candidate_id}</span><br><br>
+                        <a href="/interview/${data.candidate_id}" target="_blank" style="color: var(--accent-green); font-weight: 600; text-decoration: underline;">Open Candidate Interview Console 🔗</a>
+                    </div>
+                `;
+
+                nameInput.value = '';
+                specialtyInput.value = 'Backend Engineer';
+                loadCandidates();
+            } catch (e) {
+                console.error("Error creating candidate", e);
+                alert("Failed to create candidate.");
+            }
+        }
+
+        function monitorCandidate(candidateId) {
+            // Redirect to admin dashboard and monitor this candidate automatically
+            window.location.href = `/admin/dashboard?monitor=${candidateId}`;
+        }
+
+        // Init
+        loadCandidates();
+    </script>
+</body>
+</html>

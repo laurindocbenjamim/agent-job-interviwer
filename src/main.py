@@ -12,6 +12,9 @@ async def lifespan(app: FastAPI):
     """
     # 1. Initialize Sentry tracking from day one
     init_sentry()
+    # Initialize Postgres tables
+    from src.shared.postgres_db import init_postgres_db
+    await init_postgres_db()
     yield
     # 2. Cleanup database clients to prevent connection leaks
     await redis_client.close()

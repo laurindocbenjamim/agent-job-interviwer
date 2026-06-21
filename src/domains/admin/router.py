@@ -28,9 +28,23 @@ async def admin_dashboard():
 
 @router.get("/sessions")
 async def get_active_sessions():
-    """Returns a list of currently active candidate IDs."""
+    """Returns a list of currently active candidate IDs and their details."""
     from src.domains.interviews.router import active_sessions
-    return {"active_sessions": list(active_sessions.keys())}
+    from src.shared.redis_client import get_candidate_strikes
+    
+    ids = list(active_sessions.keys())
+    details = []
+    for cid in ids:
+        strikes = await get_candidate_strikes(cid)
+        details.append({
+            "candidate_id": cid,
+            "strikes": strikes,
+            "status": "Live" if strikes < 3 else "Flagged"
+        })
+    return {
+        "active_sessions": ids,
+        "active_sessions_details": details
+    }
 
 @router.websocket("/ws/interview/{candidate_id}")
 async def admin_interview_stream(websocket: WebSocket, candidate_id: str):
@@ -49,6 +63,26 @@ async def admin_interview_stream(websocket: WebSocket, candidate_id: str):
             admin_connections[candidate_id].remove(websocket)
         if not admin_connections.get(candidate_id):
             admin_connections.pop(candidate_id, None)
+
+from pydantic import BaseModel
+from src.shared.redis_client import redis_client
+
+class CVSettings(BaseModel):
+    yaw_thresh: float
+    pitch_thresh: float
+    brightness_thresh: float
+    gaze_min: float = 0.025
+    gaze_max: float = 0.055
+
+@router.post("/cv-settings/{candidate_id}")
+async def update_cv_settings(candidate_id: str, settings: CVSettings):
+    """Updates CV thresholds for a candidate in Redis."""
+    await redis_client.set(f"cv_threshold:yaw:{candidate_id}", settings.yaw_thresh, ex=7200)
+    await redis_client.set(f"cv_threshold:pitch:{candidate_id}", settings.pitch_thresh, ex=7200)
+    await redis_client.set(f"cv_threshold:brightness:{candidate_id}", settings.brightness_thresh, ex=7200)
+    await redis_client.set(f"cv_threshold:gaze_min:{candidate_id}", settings.gaze_min, ex=7200)
+    await redis_client.set(f"cv_threshold:gaze_max:{candidate_id}", settings.gaze_max, ex=7200)
+    return {"status": "success"}
 
 @router.post("/voice/clone")
 async def clone_voice(file: UploadFile = File(...)):

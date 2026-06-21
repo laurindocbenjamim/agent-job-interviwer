@@ -132,7 +132,22 @@ class InterviewVideoStreamTrack(VideoStreamTrack):
             img = frame.to_ndarray(format="bgr24")
             
             # analyze_frame is CPU bound, run in thread
-            is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(analyze_frame, img, draw_features=True)
+            from src.shared.redis_client import redis_client
+            yaw_val = await redis_client.get(f"cv_threshold:yaw:{self.candidate_id}")
+            pitch_val = await redis_client.get(f"cv_threshold:pitch:{self.candidate_id}")
+            bright_val = await redis_client.get(f"cv_threshold:brightness:{self.candidate_id}")
+            gaze_min_val = await redis_client.get(f"cv_threshold:gaze_min:{self.candidate_id}")
+            gaze_max_val = await redis_client.get(f"cv_threshold:gaze_max:{self.candidate_id}")
+
+            yaw_thresh = float(yaw_val) if yaw_val is not None else 20.0
+            pitch_thresh = float(pitch_val) if pitch_val is not None else 20.0
+            brightness_thresh = float(bright_val) if bright_val is not None else 90.0
+            gaze_min = float(gaze_min_val) if gaze_min_val is not None else 0.025
+            gaze_max = float(gaze_max_val) if gaze_max_val is not None else 0.055
+
+            is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(
+                analyze_frame, img, True, yaw_thresh, pitch_thresh, brightness_thresh, gaze_min, gaze_max
+            )
             
             # Broadcast to admins if any are connected
             from src.domains.admin.router import admin_connections

@@ -88,7 +88,22 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                 if frame is None:
                     continue
 
-                is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(analyze_frame, frame, True)
+                from src.shared.redis_client import redis_client
+                yaw_val = await redis_client.get(f"cv_threshold:yaw:{candidate_id}")
+                pitch_val = await redis_client.get(f"cv_threshold:pitch:{candidate_id}")
+                bright_val = await redis_client.get(f"cv_threshold:brightness:{candidate_id}")
+                gaze_min_val = await redis_client.get(f"cv_threshold:gaze_min:{candidate_id}")
+                gaze_max_val = await redis_client.get(f"cv_threshold:gaze_max:{candidate_id}")
+
+                yaw_thresh = float(yaw_val) if yaw_val is not None else 20.0
+                pitch_thresh = float(pitch_val) if pitch_val is not None else 20.0
+                brightness_thresh = float(bright_val) if bright_val is not None else 90.0
+                gaze_min = float(gaze_min_val) if gaze_min_val is not None else 0.025
+                gaze_max = float(gaze_max_val) if gaze_max_val is not None else 0.055
+
+                is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(
+                    analyze_frame, frame, True, yaw_thresh, pitch_thresh, brightness_thresh, gaze_min, gaze_max
+                )
 
                 response_data = await evaluate_candidate_frame(
                     candidate_id=candidate_id,
@@ -178,7 +193,13 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
         if track.kind == "video":
             # Wrap the incoming video track with our custom tracker
             local_video = InterviewVideoStreamTrack(track, candidate_id)
-            pc.addTrack(local_video)
+            # Find an existing video transceiver with no sender track to reuse
+            video_transceiver = next((t for t in pc.getTransceivers() if t.kind == "video" and t.sender.track is None), None)
+            if video_transceiver:
+                video_transceiver.sender.replaceTrack(local_video)
+                video_transceiver.direction = "sendrecv"
+            else:
+                pc.addTrack(local_video)
             
             @track.on("ended")
             async def on_ended():
@@ -187,7 +208,13 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
         elif track.kind == "audio":
             # Wrap the incoming audio track
             local_audio = InterviewAudioStreamTrack(track, candidate_id, tts_track, channel_ref)
-            pc.addTrack(local_audio)
+            # Find an existing audio transceiver with no sender track to reuse
+            audio_transceiver = next((t for t in pc.getTransceivers() if t.kind == "audio" and t.sender.track is None), None)
+            if audio_transceiver:
+                audio_transceiver.sender.replaceTrack(local_audio)
+                audio_transceiver.direction = "sendrecv"
+            else:
+                pc.addTrack(local_audio)
 
     # Handle offer and create answer
     await pc.setRemoteDescription(offer)

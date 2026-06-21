@@ -26,11 +26,20 @@ def wait_for_server(host: str, port: int, timeout: float = 15.0) -> bool:
 async def send_client_traffic(client_id: int, num_frames: int):
     """Simulates a single candidate sending SDP offers."""
     import httpx
+    from aiortc import RTCPeerConnection
+    from aiortc.mediastreams import AudioStreamTrack
+    
+    # Programmatically create a valid SDP offer with correct transceivers
+    pc = RTCPeerConnection()
+    pc.addTransceiver("audio", direction="sendrecv")
+    pc.addTransceiver("audio", direction="recvonly")
+    pc.addTransceiver("video", direction="sendrecv")
+    offer = await pc.createOffer()
     
     uri = f"http://{HOST}:{PORT}/interview/candidate_stress_{client_id}/offer"
     dummy_payload = {
-        "sdp": "v=0\r\no=- 4611731400430051336 2 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=extmap-allow-mixed\r\na=msid-semantic: WMS\r\n",
-        "type": "offer"
+        "sdp": offer.sdp,
+        "type": offer.type
     }
     
     latencies = []
@@ -43,8 +52,10 @@ async def send_client_traffic(client_id: int, num_frames: int):
                 latencies.append(time.perf_counter() - start)
                 await asyncio.sleep(0.05)
     except Exception as e:
+        await pc.close()
         return False, latencies, f"Client {client_id} Error: {type(e).__name__}: {e}"
     
+    await pc.close()
     return True, latencies, None
 
 def json_dumps(d):

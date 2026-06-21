@@ -232,7 +232,7 @@
 
                 <div class="camera-select-container" style="margin-top: 1rem; padding: 0 1rem;">
                     <label for="camera-select" style="display:block; margin-bottom: 0.5rem; color: var(--text-secondary);">Select Camera:</label>
-                    <select id="camera-select" style="width: 100%; padding: 0.75rem; border-radius: 0.5rem; background: var(--bg-body); color: var(--text-primary); border: 1px solid var(--border-color); outline: none;"></select>
+                    <select id="camera-select" style="width: 100%; padding: 0.75rem 1rem; border-radius: 0.5rem; background: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-subtle); outline: none; appearance: none; -webkit-appearance: none; background-image: url('data:image/svg+xml;utf8,<svg fill=%22%238b8fa3%22 height=%2224%22 viewBox=%220 0 24 24%22 width=%2224%22 xmlns=%22http://www.w3.org/2000/svg%22><path d=%22M7 10l5 5 5-5z%22/></svg>'); background-repeat: no-repeat; background-position: right 0.75rem center;"></select>
                 </div>
 
                 <div class="env-grid mt-4">
@@ -293,7 +293,7 @@
                                 <span id="current-topic">Initializing Interview...</span>
                             </div>
                             <div class="timer-display" style="margin: 0; padding: 0.5rem 1.5rem; background: var(--bg-body); border-radius: 0.5rem; border: 1px solid var(--border-color);">
-                                <div id="timer-value" class="timer-value" style="font-size: 1.5rem;">02:00</div>
+                                <div id="timer-value" class="timer-value" style="font-size: 1.5rem;">{% set mins = question_time_limit_seconds // 60 %}{% set secs = question_time_limit_seconds % 60 %}{{ "%02d:%02d"|format(mins, secs) }}</div>
                             </div>
                         </div>
 

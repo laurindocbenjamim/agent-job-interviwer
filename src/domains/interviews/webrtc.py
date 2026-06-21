@@ -132,7 +132,35 @@ class InterviewVideoStreamTrack(VideoStreamTrack):
             img = frame.to_ndarray(format="bgr24")
             
             # analyze_frame is CPU bound, run in thread
-            is_violation, details, video_quality = await asyncio.to_thread(analyze_frame, img)
+            is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(analyze_frame, img, draw_features=True)
+            
+            # Broadcast to admins if any are connected
+            from src.domains.admin.router import admin_connections
+            import cv2
+            import base64
+            
+            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
+                # encode frame to jpeg
+                _, buffer = cv2.imencode('.jpg', annotated_frame)
+                b64_image = base64.b64encode(buffer).decode('utf-8')
+                
+                payload = {
+                    "image": f"data:image/jpeg;base64,{b64_image}",
+                    "details": details,
+                    "video_quality": video_quality,
+                    "is_violation": is_violation
+                }
+                
+                disconnected_admins = []
+                for ws in admin_connections[self.candidate_id]:
+                    try:
+                        # Send without awaiting if possible or use a safe method, 
+                        # but sending json over websocket is async so we await
+                        await ws.send_json(payload)
+                    except Exception as e:
+                        disconnected_admins.append(ws)
+                for ws in disconnected_admins:
+                    admin_connections[self.candidate_id].remove(ws)
             
             # Evaluate the frame (logs telemetry and checks strike count)
             # This triggers MongoDB writes and Redis updates asynchronously.

@@ -108,6 +108,20 @@ Returns aggregated violations detected during the candidate's interview session.
 }
 ```
 
+### `GET /admin/dashboard`
+
+Serves the real-time Admin Dashboard for monitoring active interviews.
+
+**Response:** `text/html` — Admin console.
+
+### `GET /admin/sessions`
+
+Returns a list of currently active candidate sessions.
+
+### `WebSocket /ws/admin/interview/{candidate_id}`
+
+WebSocket stream broadcasting live annotated video frames and computer vision metrics to the admin dashboard.
+
 ### `WebSocket /ws/interview/{candidate_id}`
 
 Bidirectional real-time stream for video frames and compliance directives.
@@ -255,6 +269,10 @@ python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000
 Navigate to `http://localhost:8000/interview/{candidate_id}` (e.g. `http://localhost:8000/interview/candidate_123`).
 
 Allow camera and microphone access when prompted.
+
+### Open the Admin Dashboard
+
+Navigate to `http://localhost:8000/admin/dashboard` in a separate window to view active interviews and real-time computer vision metrics.
 
 ### Run tests
 

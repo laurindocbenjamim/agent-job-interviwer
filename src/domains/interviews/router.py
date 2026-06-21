@@ -16,6 +16,8 @@ from src.config.settings import settings
 
 router = APIRouter()
 
+active_sessions = {}
+
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "shared" / "templates"
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
@@ -32,6 +34,7 @@ async def serve_interview_console(candidate_id: str):
         total_user_attempt=settings.total_user_attempt,
         avatar_gender=settings.avatar_gender.lower(),
         agent_speech_speed=settings.agent_speech_speed,
+        question_time_limit_seconds=settings.question_time_limit_seconds,
     )
     return HTMLResponse(content=rendered)
 
@@ -62,6 +65,7 @@ async def get_violations_report(candidate_id: str):
 async def interview_stream(websocket: WebSocket, candidate_id: str):
     """WebSocket stream for camera frames and compliance verification."""
     await websocket.accept()
+    active_sessions[candidate_id] = {}
 
     try:
         while True:
@@ -84,7 +88,7 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                 if frame is None:
                     continue
 
-                is_violation, details, video_quality = await asyncio.to_thread(analyze_frame, frame)
+                is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(analyze_frame, frame, True)
 
                 response_data = await evaluate_candidate_frame(
                     candidate_id=candidate_id,
@@ -93,7 +97,34 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                     video_quality=video_quality,
                 )
 
+                # Broadcast to admins if any are connected
+                from src.domains.admin.router import admin_connections
+                if candidate_id in admin_connections and admin_connections[candidate_id]:
+                    _, buffer = cv2.imencode('.jpg', annotated_frame)
+                    b64_image = base64.b64encode(buffer).decode('utf-8')
+                    admin_payload = {
+                        "image": f"data:image/jpeg;base64,{b64_image}",
+                        "details": details,
+                        "video_quality": video_quality,
+                        "is_violation": is_violation,
+                        "current_strikes": response_data.get("current_strikes", 0)
+                    }
+                    disconnected_admins = []
+                    for admin_ws in admin_connections[candidate_id]:
+                        try:
+                            await admin_ws.send_json(admin_payload)
+                        except Exception:
+                            disconnected_admins.append(admin_ws)
+                    for admin_ws in disconnected_admins:
+                        admin_connections[candidate_id].remove(admin_ws)
+
                 await websocket.send_json(response_data)
+            except WebSocketDisconnect:
+                break
+            except RuntimeError as re:
+                if "disconnect" in str(re).lower() or "receive" in str(re).lower():
+                    break
+                print(f"[WS DEBUG] Inner loop error for {candidate_id}: {re}")
             except Exception as inner_e:
                 print(f"[WS DEBUG] Inner loop error for {candidate_id}: {inner_e}")
 
@@ -101,6 +132,8 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
         await log_activity(candidate_id, "session_disconnected", {"status": "closed"})
     except Exception as outer_e:
         print(f"[WS DEBUG] Outer loop error for {candidate_id}: {outer_e}")
+    finally:
+        active_sessions.pop(candidate_id, None)
 
 from pydantic import BaseModel
 from aiortc import RTCPeerConnection, RTCSessionDescription
@@ -108,7 +141,6 @@ from src.domains.interviews.webrtc import InterviewVideoStreamTrack, InterviewAu
 
 # Store peer connections to prevent garbage collection and allow cleanup
 peer_connections = set()
-active_sessions = {}
 
 class OfferRequest(BaseModel):
     sdp: str

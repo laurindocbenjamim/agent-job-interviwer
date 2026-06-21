@@ -63,8 +63,8 @@ async def test_evaluate_frame_with_violation_warning():
         )
 
 @pytest.mark.asyncio
-async def test_evaluate_frame_with_violation_termination():
-    """Test that the 4th strike triggers termination."""
+async def test_evaluate_frame_with_violation_no_termination():
+    """Test that the 4th strike (or higher) does not trigger termination but continues to warn."""
     candidate_id = "candidate_test"
     details = {"gaze_metric": 0.01, "brightness": 120.0, "status": "Looking Away"}
     video_quality = "Good"
@@ -83,7 +83,7 @@ async def test_evaluate_frame_with_violation_termination():
             video_quality=video_quality
         )
         
-        assert result["action"] == "terminate"
+        assert result["action"] == "warn"
         assert result["video_quality"] == "Good"
         assert result["current_strikes"] == 4
         

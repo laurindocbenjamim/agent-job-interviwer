@@ -79,38 +79,40 @@ async function getConnectedDevices() {
 }
 
 async function initCamera(deviceId = null) {
-    try {
-        const videoConstraints = deviceId ? { deviceId: { exact: deviceId } } : true;
-        const videoStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
-        State.localStream = videoStream;
-        video.srcObject = videoStream;
-        updateEnvCheck('camera', true);
-        updateEnvStatus('env-camera', 'Good', 'ok');
-        
-        // Populate dropdown on first load
-        if (!deviceId) getConnectedDevices();
-        
-    } catch (err) {
-        console.error('[Camera] Failed to access webcam:', err);
-        updateEnvCheck('camera', false);
-        updateEnvStatus('env-camera', 'Failed', 'error');
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.error("Browser API navigator.mediaDevices.getUserMedia not available.");
+        updateEnvStatus('env-camera', 'Unavailable', 'error');
+        updateEnvStatus('env-voice', 'Unavailable', 'error');
+        return;
     }
 
     try {
-        if (!State.audioContext) {
-            const audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            if (State.localStream) {
-                audioStream.getAudioTracks().forEach(t => State.localStream.addTrack(t));
-            } else {
-                State.localStream = audioStream;
-            }
-            initAudioMeter(State.localStream);
-            updateEnvCheck('mic', true);
-        }
+        const videoConstraints = deviceId ? { deviceId: { exact: deviceId } } : true;
+        
+        // Request both video and audio in a single prompt to ensure the popup shows correctly
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            video: videoConstraints, 
+            audio: true 
+        });
+        
+        State.localStream = stream;
+        video.srcObject = stream;
+        
+        updateEnvCheck('camera', true);
+        updateEnvStatus('env-camera', 'Good', 'ok');
+        
+        initAudioMeter(stream);
+        updateEnvCheck('mic', true);
+        
+        // Populate dropdown on first load after permissions are granted
+        if (!deviceId) getConnectedDevices();
+        
     } catch (err) {
-        console.error('[Audio] Failed to access microphone:', err);
+        console.error('[Camera/Mic] Failed to access devices:', err);
+        updateEnvCheck('camera', false);
+        updateEnvStatus('env-camera', 'Failed (Check Permissions)', 'error');
         updateEnvCheck('mic', false);
-        updateEnvStatus('env-voice', 'Unavailable', 'error');
+        updateEnvStatus('env-voice', 'Failed', 'error');
     }
 
     checkPreviewReady();

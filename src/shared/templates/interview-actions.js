@@ -4,7 +4,7 @@
 
 /* ─── Question Timer & Submission ─── */
 let questionTimerInterval = null;
-const QUESTION_LIMIT = 120; // Default to 2 minutes per question
+const QUESTION_LIMIT = parseInt('{{ question_time_limit_seconds }}') || 60;
 
 function startQuestionTimer() {
     if (questionTimerInterval) clearInterval(questionTimerInterval);
@@ -17,6 +17,21 @@ function startQuestionTimer() {
     questionTimerInterval = setInterval(() => {
         State.remainingSeconds--;
         updateTimerDisplay();
+        if (State.remainingSeconds <= 0) {
+            submitAnswer(true);
+        }
+    }, 1000);
+}
+
+function updateTimerDisplay() {
+    const mins = Math.floor(State.remainingSeconds / 60);
+    const secs = State.remainingSeconds % 60;
+    const el = $('timer-value');
+    if (el) {
+        el.textContent = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        el.className = State.remainingSeconds <= 60 ? 'timer-value warning' : 'timer-value';
+    }
+}
 
 let currentInputType = 'voice';
 
@@ -202,6 +217,11 @@ function endInterview(reason) {
 
     // Close WebSocket
     if (State.ws) { State.ws.close(); State.ws = null; }
+
+    // Stop active or queued speech synthesis immediately
+    if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+    }
 
     // Update post-interview UI
     const reasonEl = $('end-reason');

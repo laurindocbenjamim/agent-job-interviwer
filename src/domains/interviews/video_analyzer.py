@@ -60,9 +60,10 @@ def extract_euler_angles_from_matrix(matrix: np.ndarray) -> Tuple[float, float, 
     
     return pitch, yaw, roll
 
-def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
+def analyze_frame(frame: np.ndarray, draw_features: bool = False) -> Tuple[bool, Dict[str, Any], str, np.ndarray]:
     """
     Evaluates video quality and facial posture layout using modern MediaPipe Tasks API.
+    Optionally draws landmarks and text on the frame for debugging/dashboard visualization.
     """
     # 1. Validate Video Brightness
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -77,13 +78,18 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     landmarker = get_landmarker()
     results = landmarker.detect(mp_image)
     
+    # Output frame to draw on (default is original)
+    annotated_frame = frame.copy() if draw_features else frame
+
     if not results.face_landmarks or not results.facial_transformation_matrixes:
         details = {
             "status": "No Face Detected",
             "reason": "Face not visible or lighting is too poor",
             "brightness": float(avg_brightness)
         }
-        return True, details, video_quality
+        if draw_features:
+            cv2.putText(annotated_frame, "NO FACE DETECTED", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        return True, details, video_quality, annotated_frame
 
     landmarks = results.face_landmarks[0]
     
@@ -97,7 +103,9 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
             "reason": "Please center your face in the camera.",
             "brightness": float(avg_brightness)
         }
-        return True, details, video_quality
+        if draw_features:
+            cv2.putText(annotated_frame, "OUT OF FRAME", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
+        return True, details, video_quality, annotated_frame
     
     # Extract true 3D Head Pose Angles
     transformation_matrix = results.facial_transformation_matrixes[0]
@@ -106,11 +114,45 @@ def analyze_frame(frame: np.ndarray) -> Tuple[bool, Dict[str, Any], str]:
     # Thresholds: If the head turns more than 20 degrees left/right or up/down
     is_looking_away = abs(yaw) > 20.0 or abs(pitch) > 20.0
     
+    status = "Looking Away" if is_looking_away else "Focused"
     details = {
         "yaw": float(yaw),
         "pitch": float(pitch),
         "brightness": float(avg_brightness),
-        "status": "Looking Away" if is_looking_away else "Focused"
+        "status": status
     }
 
-    return is_looking_away, details, video_quality
+    if draw_features:
+        # Draw face mesh using mediapipe drawing utils
+        from mediapipe import solutions
+        
+        # Convert landmarks to NormalizedLandmarkList for drawing
+        from mediapipe.framework.formats import landmark_pb2
+        face_landmarks_proto = landmark_pb2.NormalizedLandmarkList()
+        face_landmarks_proto.landmark.extend([
+            landmark_pb2.NormalizedLandmark(x=landmark.x, y=landmark.y, z=landmark.z) for landmark in landmarks
+        ])
+
+        solutions.drawing_utils.draw_landmarks(
+            image=annotated_frame,
+            landmark_list=face_landmarks_proto,
+            connections=solutions.face_mesh.FACEMESH_TESSELATION,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=solutions.drawing_styles.get_default_face_mesh_tesselation_style()
+        )
+        solutions.drawing_utils.draw_landmarks(
+            image=annotated_frame,
+            landmark_list=face_landmarks_proto,
+            connections=solutions.face_mesh.FACEMESH_CONTOURS,
+            landmark_drawing_spec=None,
+            connection_drawing_spec=solutions.drawing_styles.get_default_face_mesh_contours_style()
+        )
+
+        # Draw metrics on the frame
+        color = (0, 0, 255) if is_looking_away else (0, 255, 0)
+        cv2.putText(annotated_frame, f"Status: {status}", (20, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        cv2.putText(annotated_frame, f"Pitch: {pitch:.1f}", (20, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(annotated_frame, f"Yaw: {yaw:.1f}", (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(annotated_frame, f"Brightness: {avg_brightness:.1f}", (20, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+
+    return is_looking_away, details, video_quality, annotated_frame

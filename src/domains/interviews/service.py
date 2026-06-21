@@ -37,9 +37,7 @@ async def evaluate_candidate_frame(
             "cause": details
         })
         
-        if current_strikes >= 4:
-            response_data["action"] = "terminate"
-        else:
-            response_data["action"] = "warn"
+        # Always warn to allow interview to continue per requirements
+        response_data["action"] = "warn"
             
     return response_data

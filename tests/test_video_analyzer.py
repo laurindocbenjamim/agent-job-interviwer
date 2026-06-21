@@ -1,19 +1,20 @@
 import numpy as np
 import pytest
+import math
 from unittest.mock import MagicMock, patch
 from src.domains.interviews.video_analyzer import analyze_frame
 
 def test_analyze_frame_dark_room():
-    """Test that a dark frame results in a 'Too Dark' quality status."""
+    """Test that a dark frame results in a 'Poor Lighting' quality status."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     
     with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
-        is_violation, details, quality = analyze_frame(frame)
+        is_violation, details, quality, _ = analyze_frame(frame)
         
-        assert quality == "Too Dark"
+        assert quality == "Poor Lighting"
         assert is_violation is True
         assert details["status"] == "No Face Detected"
 
@@ -25,59 +26,66 @@ def test_analyze_frame_bright_room_no_face():
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
-        is_violation, details, quality = analyze_frame(frame)
+        is_violation, details, quality, _ = analyze_frame(frame)
         
         assert quality == "Good"
         assert is_violation is True
         assert details["status"] == "No Face Detected"
 
 def test_analyze_frame_focused_gaze():
-    """Test when horizontal distance is in focused range (0.02 - 0.06)."""
+    """Test when head pose is focused (angles <= 20 degrees)."""
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 128
     
-    # Mock landmarks
-    mock_landmark_left_iris = MagicMock()
-    mock_landmark_left_iris.x = 0.54  # horizontal diff is 0.04
-    mock_landmark_left_eye_corner = MagicMock()
-    mock_landmark_left_eye_corner.x = 0.50
+    mock_nose_tip = MagicMock()
+    mock_nose_tip.x = 0.5
+    mock_nose_tip.y = 0.5
     
-    # Create landmark list where index 468 is iris, 33 is corner
     mock_landmarks = [MagicMock()] * 500
-    mock_landmarks[468] = mock_landmark_left_iris
-    mock_landmarks[33] = mock_landmark_left_eye_corner
+    mock_landmarks[1] = mock_nose_tip
+    
+    # Focused matrix: identity matrix (yaw=0, pitch=0)
+    mock_matrix = np.eye(4)
     
     with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
+        mock_detect.return_value.facial_transformation_matrixes = [mock_matrix]
         
-        is_violation, details, quality = analyze_frame(frame)
+        is_violation, details, quality, _ = analyze_frame(frame)
         
         assert quality == "Good"
         assert is_violation is False
         assert details["status"] == "Focused"
-        assert pytest.approx(details["gaze_metric"]) == 0.04
+        assert pytest.approx(details["yaw"]) == 0.0
+        assert pytest.approx(details["pitch"]) == 0.0
 
 def test_analyze_frame_looking_away_gaze():
-    """Test when candidate is looking away (diff < 0.02 or diff > 0.06)."""
+    """Test when head pose is turned away (yaw > 20 degrees)."""
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 128
     
-    # Mock landmarks - diff is 0.01 (too narrow)
-    mock_landmark_left_iris = MagicMock()
-    mock_landmark_left_iris.x = 0.51
-    mock_landmark_left_eye_corner = MagicMock()
-    mock_landmark_left_eye_corner.x = 0.50
+    mock_nose_tip = MagicMock()
+    mock_nose_tip.x = 0.5
+    mock_nose_tip.y = 0.5
     
     mock_landmarks = [MagicMock()] * 500
-    mock_landmarks[468] = mock_landmark_left_iris
-    mock_landmarks[33] = mock_landmark_left_eye_corner
+    mock_landmarks[1] = mock_nose_tip
+    
+    # 25 degree rotation around Y-axis (yaw)
+    mock_matrix = np.eye(4)
+    theta = math.radians(25)
+    mock_matrix[0, 0] = math.cos(theta)
+    mock_matrix[0, 2] = math.sin(theta)
+    mock_matrix[2, 0] = -math.sin(theta)
+    mock_matrix[2, 2] = math.cos(theta)
     
     with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
+        mock_detect.return_value.facial_transformation_matrixes = [mock_matrix]
         
-        is_violation, details, quality = analyze_frame(frame)
+        is_violation, details, quality, _ = analyze_frame(frame)
         
         assert quality == "Good"
         assert is_violation is True
         assert details["status"] == "Looking Away"
-        assert pytest.approx(details["gaze_metric"]) == 0.01
+        assert pytest.approx(details["yaw"]) == 25.0

@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Real-time CV Monitoring</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: #000000;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Glassmorphic Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-right: 1px solid var(--glass-border);
+            display: flex;
+            flex-direction: column;
+            transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            position: relative;
+            z-index: 10;
+        }
+
+        .sidebar.collapsed {
+            width: 80px;
+        }
+
+        .sidebar-header {
+            height: 80px;
+            padding: 0 1.5rem;
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed .sidebar-header {
+            padding: 0;
+            justify-content: center;
+        }
+
+        .sidebar-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 700;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar.collapsed .sidebar-title {
+            opacity: 0;
+            display: none;
+        }
+
+        .toggle-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            transition: all 0.2s;
+            flex-shrink: 0;
+        }
+
+        .toggle-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: scale(1.05);
+        }
+
+        .sessions-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .sidebar.collapsed .sessions-list {
+            padding: 1.5rem 0.5rem;
+            align-items: center;
+        }
+
+        .session-item {
+            padding: 1rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            overflow: hidden;
+            white-space: nowrap;
+        }
+
+        .sidebar.collapsed .session-item {
+            padding: 0.75rem;
+            justify-content: center;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+        }
+
+        .session-item:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateX(4px);
+        }
+
+        .sidebar.collapsed .session-item:hover {
+            transform: scale(1.1);
+        }
+
+        .session-item.active {
+            border-color: rgba(59, 130, 246, 0.5);
+            background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
+            box-shadow: inset 4px 0 0 var(--accent-blue);
+        }
+
+        .sidebar.collapsed .session-item.active {
+            box-shadow: inset 0 0 0 2px var(--accent-blue);
+            background: rgba(59, 130, 246, 0.2);
+        }
+
+        .session-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 10px var(--accent-green);
+            flex-shrink: 0;
+            position: relative;
+        }
+
+        /* Ping animation for live dot */
+        .session-dot::after {
+            content: '';
+            position: absolute;
+            inset: -4px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes ping {
+            75%, 100% { transform: scale(2); opacity: 0; }
+        }
+
+        .session-info {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            opacity: 1;
+            transition: opacity 0.3s;
+        }
+
+        .sidebar.collapsed .session-info {
+            opacity: 0;
+            display: none;
+        }
+
+        .candidate-id { font-weight: 600; font-size: 0.95rem; }
+        .session-status { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
+
+        /* Main View */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 1;
+        }
+
+        .topbar {
+            height: 80px;
+            background: rgba(15, 23, 42, 0.4);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            align-items: center;
+            padding: 0 3rem;
+            font-size: 1.4rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .content-area {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 2.5rem;
+            padding: 2.5rem;
+            overflow-y: auto;
+        }
+
+        /* Glass Cards */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+        }
+
+        /* Video Feed */
+        .video-container {
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            min-height: 500px;
+        }
+
+        .video-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 24px;
+        }
+
+        .no-video-overlay {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 1.3rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 24px;
+        }
+
+        .no-video-icon {
+            font-size: 4rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.5;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
+        }
+
+        /* Metrics Sidebar */
+        .metrics-sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .metric-card {
+            padding: 2rem;
+        }
+
+        .metric-title {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background-color 0.2s;
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .metric-label {
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .metric-val {
+            font-weight: 600;
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+
+        .badge {
+            padding: 0.4rem 1rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .badge.ok { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge.warning { background: rgba(245, 158, 11, 0.15); color: var(--accent-orange); border: 1px solid rgba(245, 158, 11, 0.3); }
+        .badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
+
+        .log-container {
+            flex: 1;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 12px;
+            padding: 1.2rem;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 0.85rem;
+            color: #a7f3d0;
+            overflow-y: auto;
+            max-height: 250px;
+            border: 1px solid rgba(255,255,255,0.05);
+            box-shadow: inset 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .log-entry { margin-bottom: 0.6rem; line-height: 1.4; opacity: 0.9; }
+        .log-entry.error { color: #fca5a5; }
+        .log-entry.warn { color: #fcd34d; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+
+    </style>
+</head>
+<body>
+
+    <div class="sidebar collapsed" id="sidebar">
+        <div class="sidebar-header">
+            <div class="sidebar-title">
+                <span style="font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));">🛡️</span> Admin Console
+            </div>
+            <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12"></line>
+                    <line x1="3" y1="6" x2="21" y2="6"></line>
+                    <line x1="3" y1="18" x2="21" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="sessions-list" id="sessions-list">
+            <!-- Populated by JS -->
+            <div class="session-info" style="color:var(--text-secondary); padding: 1rem; text-align: center;">Loading...</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="topbar" style="display: flex; justify-content: space-between; align-items: center; padding-right: 3rem;">
+            <div id="topbar-title">Select a session to monitor</div>
+            <div class="manual-watch-container" style="display: flex; gap: 0.75rem; align-items: center;">
+                <input type="text" id="manual-candidate-id" placeholder="Enter Candidate ID" style="padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); outline: none; font-family: inherit; font-size: 0.95rem; width: 220px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--glass-border)'">
+                <button onclick="watchManualCandidate()" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: none; background: var(--accent-blue); color: white; font-weight: 600; font-family: inherit; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;">Watch</button>
+            </div>
+        </div>
+        
+        <div class="content-area">
+            <div class="glass-card video-container">
+                <div class="no-video-overlay" id="no-video">
+                    <span class="no-video-icon">📡</span>
+                    Waiting for secure feed...
+                </div>
+                <img id="cv-feed" src="" style="display: none;" alt="CV Annotated Feed">
+            </div>
+
+            <div class="metrics-sidebar">
+                <div class="glass-card metric-card">
+                    <div class="metric-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        Telemetry Data
+                    </div>
+                    
+                    <div class="metric-row">
+                        <span class="metric-label">Subject Status</span>
+                        <span id="m-status" class="badge ok">Awaiting</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Strikes Issued</span>
+                        <span id="m-strikes" class="metric-val">0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Pitch (Vertical)</span>
+                        <span id="m-pitch" class="metric-val">0.0°</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Yaw (Horizontal)</span>
+                        <span id="m-yaw" class="metric-val">0.0°</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Environment Light</span>
+                        <span id="m-bright" class="metric-val">0.0</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="metric-label">Video Integrity</span>
+                        <span id="m-quality" class="badge ok">Awaiting</span>
+                    </div>
+                </div>
+
+                <div class="glass-card metric-card" style="flex:1; display: flex; flex-direction: column;">
+                    <div class="metric-title">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                        System Logs
+                    </div>
+                    <div class="log-container" id="event-logs">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentWs = null;
+        let activeSessionId = null;
+
+        function logEvent(msg, type='info') {
+            const logs = document.getElementById('event-logs');
+            const time = new Date().toLocaleTimeString();
+            const el = document.createElement('div');
+            el.className = `log-entry ${type}`;
+            el.innerHTML = `<span style="opacity:0.5">[${time}]</span> ${msg}`;
+            logs.appendChild(el);
+            logs.scrollTop = logs.scrollHeight;
+        }
+
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('collapsed');
+        }
+
+        async function fetchSessions() {
+            try {
+                const res = await fetch('/admin/sessions');
+                const data = await res.json();
+                
+                const list = document.getElementById('sessions-list');
+                
+                if (!data.active_sessions || data.active_sessions.length === 0) {
+                    list.innerHTML = '<div class="session-info" style="color:var(--text-secondary); padding: 2rem 1rem; text-align: center; font-size: 0.9rem;">No active streams found</div>';
+                    return;
+                }
+
+                // Rebuild list only if it changed to prevent flicker, but for simplicity we rebuild
+                list.innerHTML = '';
+                data.active_sessions.forEach(id => {
+                    const el = document.createElement('div');
+                    el.className = `session-item ${id === activeSessionId ? 'active' : ''}`;
+                    el.onclick = () => selectSession(id);
+                    el.title = `Monitor Candidate: ${id}`;
+                    
+                    el.innerHTML = `
+                        <div class="session-dot"></div>
+                        <div class="session-info">
+                            <div class="candidate-id">${id.length > 15 ? id.substring(0, 15) + '...' : id}</div>
+                            <div class="session-status">Live Stream Active</div>
+                        </div>
+                    `;
+                    list.appendChild(el);
+                });
+
+                if (!activeSessionId && data.active_sessions.length > 0) {
+                    selectSession(data.active_sessions[0]);
+                }
+
+            } catch (e) {
+                console.error("Failed to fetch sessions", e);
+            }
+        }
+
+        function selectSession(id) {
+            if (activeSessionId === id) return;
+            activeSessionId = id;
+            
+            document.getElementById('topbar-title').innerHTML = `Monitoring Session: <span style="color:var(--accent-blue); margin-left:0.5rem;">${id}</span>`;
+            document.getElementById('no-video').style.display = 'flex';
+            document.getElementById('cv-feed').style.display = 'none';
+            document.getElementById('event-logs').innerHTML = '';
+            
+            logEvent(`Initiating secure connection to stream ${id}...`);
+            fetchSessions(); // update active state classes
+            
+            if (currentWs) {
+                currentWs.close();
+            }
+
+            const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            currentWs = new WebSocket(`${scheme}//${window.location.host}/admin/ws/interview/${id}`);
+
+            currentWs.onopen = () => {
+                logEvent('WebSocket connection established.', 'info');
+            };
+
+            currentWs.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                
+                if (data.image) {
+                    document.getElementById('no-video').style.display = 'none';
+                    const img = document.getElementById('cv-feed');
+                    img.style.display = 'block';
+                    img.src = data.image;
+                }
+
+                if (data.details) {
+                    updateMetrics(data.details, data.video_quality, data.is_violation, data.current_strikes);
+                }
+            };
+
+            currentWs.onerror = () => logEvent('WebSocket connection error.', 'error');
+            currentWs.onclose = () => {
+                logEvent('Stream disconnected by peer.', 'warn');
+                document.getElementById('no-video').style.display = 'flex';
+                document.getElementById('cv-feed').style.display = 'none';
+            };
+        }
+
+        function updateMetrics(details, quality, isViolation, currentStrikes) {
+            document.getElementById('m-pitch').textContent = (details.pitch || 0).toFixed(1) + '°';
+            document.getElementById('m-yaw').textContent = (details.yaw || 0).toFixed(1) + '°';
+            document.getElementById('m-bright').textContent = (details.brightness || 0).toFixed(1);
+            
+            if (currentStrikes !== undefined) {
+                document.getElementById('m-strikes').textContent = currentStrikes;
+            }
+            
+            const qBadge = document.getElementById('m-quality');
+            qBadge.textContent = quality || 'Unknown';
+            qBadge.className = 'badge ' + (quality === 'Good' ? 'ok' : 'danger');
+
+            const sBadge = document.getElementById('m-status');
+            sBadge.textContent = details.status || 'Unknown';
+            
+            if (isViolation) {
+                sBadge.className = 'badge danger';
+                // log if status changed to violation recently to avoid spam
+                if (!window.lastViolation || (Date.now() - window.lastViolation > 2500)) {
+                    logEvent(`VIOLATION: Subject is ${details.status}`, 'error');
+                    window.lastViolation = Date.now();
+                }
+            } else {
+                sBadge.className = 'badge ok';
+            }
+        }
+
+        function watchManualCandidate() {
+            const input = document.getElementById('manual-candidate-id');
+            const id = input.value.trim();
+            if (id) {
+                selectSession(id);
+                input.value = '';
+            }
+        }
+
+        // Init
+        fetchSessions();
+        setInterval(fetchSessions, 5000);
+    </script>
+</body>
+</html>

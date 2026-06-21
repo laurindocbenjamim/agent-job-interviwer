@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     interview_objective: str = Field("Conduct a professional, friendly, and rigorous interview.", alias="INTERVIEW_OBJECTIVE")
     interview_topics: str = Field("Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines", alias="INTERVIEW_TOPICS")
     num_questions: int = Field(5, alias="NUM_QUESTIONS")
-    question_time_limit_seconds: int = Field(300, alias="QUESTION_TIME_LIMIT_SECONDS")
+    question_time_limit_seconds: int = Field(60, alias="QUESTION_TIME_LIMIT_SECONDS")
     avatar_gender: str = Field("female", alias="AVATAR_GENDER")
     agent_speech_speed: float = Field(1.0, alias="AGENT_SPEECH_SPEED")
 

@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Cloning - Admin Console</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-gradient: #000000;
+            --glass-bg: rgba(20, 20, 20, 0.6);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-orange: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2.5rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 1.5rem;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.75rem;
+            font-weight: 700;
+        }
+
+        .back-btn {
+            padding: 0.6rem 1.2rem;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-primary);
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 24px;
+            border: 1px solid var(--glass-border);
+            box-shadow: var(--glass-shadow);
+            padding: 2rem;
+        }
+
+        .form-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 1.2rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .info-text {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            text-align: center;
+            background: rgba(255,255,255,0.02);
+            transition: all 0.2s;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        .action-btn {
+            padding: 0.8rem 1.5rem;
+            border-radius: 10px;
+            border: none;
+            color: white;
+            font-weight: 600;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .action-btn.primary { background: var(--accent-blue); }
+        .action-btn.record { background: var(--accent-red); }
+        .action-btn.stop { background: var(--text-secondary); color: var(--bg-gradient); }
+        
+        .action-btn:hover { opacity: 0.9; }
+        .action-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            text-align: center;
+            margin: 2rem 0;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .divider::before, .divider::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px solid var(--glass-border);
+        }
+        .divider::before { margin-right: 1em; }
+        .divider::after { margin-left: 1em; }
+
+        #status-msg {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 10px;
+            display: none;
+            font-weight: 500;
+            text-align: center;
+        }
+        
+        .timer {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-red);
+            text-align: center;
+            margin-bottom: 1rem;
+            font-variant-numeric: tabular-nums;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="header-title">
+                <span>🎤</span> Voice Cloning Studio
+            </h1>
+            <a href="/admin/dashboard" class="back-btn">
+                <span>🔙</span> Back to Dashboard
+            </a>
+        </div>
+
+        <div class="glass-card">
+            <h2 class="form-title">Upload Pre-recorded Audio</h2>
+            <p class="info-text">Upload a clean audio file (.wav, .mp3, .m4a) of the voice you want to clone. For best results, provide exactly 15 to 30 seconds of speech without background noise or music.</p>
+            
+            <input type="file" id="audio-upload" accept="audio/*" style="display: none;" onchange="handleFileSelected(event)">
+            <div class="upload-area" onclick="document.getElementById('audio-upload').click()">
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">📁</div>
+                <div style="font-weight: 600; color: var(--text-primary);">Click to select an audio file</div>
+                <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 0.5rem;" id="file-name-display">No file selected</div>
+            </div>
+            <button class="action-btn primary" id="upload-btn" onclick="uploadAudioFile()" disabled>
+                <span>⬆️</span> Upload & Clone Voice
+            </button>
+
+            <div class="divider">OR</div>
+
+            <h2 class="form-title">Record Voice Live</h2>
+            <p class="info-text">Use your microphone to record your voice. Read the text below naturally. <strong>Maximum recording time is 30 seconds.</strong> The recording will automatically stop after 30 seconds to ensure optimal cloning quality.</p>
+
+            <div style="background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; border-left: 4px solid var(--accent-blue); font-style: italic; color: var(--text-secondary);">
+                "Hello, I am testing the new AI voice cloning system. This is a sample of my natural speaking voice to ensure the system captures the unique tone, pitch, and cadence. One, two, three, four, five. The quick brown fox jumps over the lazy dog."
+            </div>
+
+            <div class="timer" id="record-timer" style="display: none;">00:00</div>
+
+            <div style="display: flex; gap: 1rem;">
+                <button class="action-btn record" id="record-btn" onclick="startRecording()">
+                    <span>🎙️</span> Start Recording
+                </button>
+                <button class="action-btn stop" id="stop-btn" onclick="stopRecording()" style="display: none;">
+                    <span>⏹️</span> Stop & Submit
+                </button>
+            </div>
+        </div>
+
+        <div id="status-msg"></div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let timerInterval = null;
+        let secondsRecorded = 0;
+        const MAX_SECONDS = 30;
+
+        function showStatus(msg, type) {
+            const statusDiv = document.getElementById('status-msg');
+            statusDiv.style.display = 'block';
+            statusDiv.innerHTML = msg;
+            if (type === 'success') {
+                statusDiv.style.background = 'rgba(16, 185, 129, 0.1)';
+                statusDiv.style.color = 'var(--accent-green)';
+                statusDiv.style.border = '1px solid var(--accent-green)';
+            } else if (type === 'error') {
+                statusDiv.style.background = 'rgba(239, 68, 68, 0.1)';
+                statusDiv.style.color = 'var(--accent-red)';
+                statusDiv.style.border = '1px solid var(--accent-red)';
+            } else {
+                statusDiv.style.background = 'rgba(59, 130, 246, 0.1)';
+                statusDiv.style.color = 'var(--accent-blue)';
+                statusDiv.style.border = '1px solid var(--accent-blue)';
+            }
+        }
+
+        function handleFileSelected(e) {
+            if (e.target.files && e.target.files.length > 0) {
+                selectedFile = e.target.files[0];
+                document.getElementById('file-name-display').textContent = selectedFile.name;
+                document.getElementById('upload-btn').disabled = false;
+            }
+        }
+
+        async function uploadAudioFile() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+            
+            showStatus('Uploading and processing audio...', 'info');
+            document.getElementById('upload-btn').disabled = true;
+
+            try {
+                const res = await fetch('/admin/voice/clone', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await res.json();
+                if (res.ok) {
+                    showStatus(`✅ ${data.message}`, 'success');
+                } else {
+                    showStatus(`❌ Error: ${data.detail || 'Upload failed'}`, 'error');
+                }
+            } catch (err) {
+                console.error(err);
+                showStatus(`❌ Network Error: Could not connect to server.`, 'error');
+            } finally {
+                document.getElementById('upload-btn').disabled = false;
+            }
+        }
+
+        async function startRecording() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => {
+                    if (e.data.size > 0) audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = async () => {
+                    clearInterval(timerInterval);
+                    document.getElementById('record-timer').style.display = 'none';
+                    document.getElementById('record-btn').style.display = 'flex';
+                    document.getElementById('stop-btn').style.display = 'none';
+                    
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/webm' }); 
+                    const file = new File([audioBlob], "recorded_voice.webm", { type: 'audio/webm' });
+                    
+                    const formData = new FormData();
+                    formData.append("file", file);
+
+                    showStatus('Uploading recorded audio...', 'info');
+                    
+                    try {
+                        const res = await fetch('/admin/voice/clone', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showStatus(`✅ ${data.message}`, 'success');
+                        } else {
+                            showStatus(`❌ Error: ${data.detail || 'Upload failed'}`, 'error');
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        showStatus(`❌ Network Error: Could not connect to server.`, 'error');
+                    }
+                    
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                
+                document.getElementById('record-btn').style.display = 'none';
+                document.getElementById('stop-btn').style.display = 'flex';
+                
+                secondsRecorded = 0;
+                document.getElementById('record-timer').style.display = 'block';
+                document.getElementById('record-timer').textContent = "00:00";
+                
+                timerInterval = setInterval(() => {
+                    secondsRecorded++;
+                    const m = String(Math.floor(secondsRecorded / 60)).padStart(2, '0');
+                    const s = String(secondsRecorded % 60).padStart(2, '0');
+                    document.getElementById('record-timer').textContent = `${m}:${s}`;
+                    
+                    if (secondsRecorded >= MAX_SECONDS) {
+                        stopRecording();
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error("Error accessing microphone", err);
+                alert("Could not access microphone. Please ensure you have granted permission.");
+            }
+        }
+
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+            }
+        }
+    </script>
+</body>
+</html>

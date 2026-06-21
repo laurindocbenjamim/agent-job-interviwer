@@ -3,26 +3,24 @@ import os
 import asyncio
 from typing import Dict, List, Tuple
 from langchain_groq import ChatGroq
+from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from src.config.settings import settings
 
 # Bounded context session state
-_sessions: Dict[str, List[Dict[str, str]]] = {}
+_sessions: Dict[str, List[Tuple[str, str]]] = {}
 _injected_questions_queue: Dict[str, List[str]] = {}
 
 def queue_injected_question(candidate_id: str, question: str) -> None:
     """Queues a custom question from the admin for a candidate."""
-    if candidate_id not in _injected_questions_queue:
-        _injected_questions_queue[candidate_id] = []
-    _injected_questions_queue[candidate_id].append(question)
+    _injected_questions_queue.setdefault(candidate_id, []).append(question)
 
 def get_dynamic_prompt(objective: str = None, topics: str = None, num_questions: int = None) -> str:
     """Generates the dynamic prompt string based on settings."""
-    obj = objective if objective else settings.interview_objective
-    tops = topics if topics else settings.interview_topics
+    obj = objective or settings.interview_objective
+    tops = topics or settings.interview_topics
     num_q = num_questions if num_questions is not None else settings.num_questions
-
     topics_list = [t.strip() for t in tops.split(",")]
     topics_str = "\n".join([f"{i+1}. {topic}" for i, topic in enumerate(topics_list)])
     return f"""You are an expert AI Job Interviewer. Your objective is to {obj}.
@@ -75,8 +73,7 @@ async def transcribe_audio(audio_bytes: bytes) -> str:
         return ""
 
 class InterviewAgent:
-    """Agent orchestrator for handling active interview responses (SRP/Facade)."""
-    
+    """Agent orchestrator for handling active interview responses."""
     def __init__(self):
         self.llm = ChatGroq(
             groq_api_key=settings.groq_api_key,
@@ -95,7 +92,7 @@ class InterviewAgent:
         
         from src.shared.postgres_db import get_postgres_config
         config = await get_postgres_config(candidate_id)
-        base_time_limit = config.question_time_limit_seconds if config else 60
+        base_limit = config.question_time_limit_seconds if config else 60
 
         if candidate_id not in _sessions:
             if config:
@@ -106,8 +103,7 @@ class InterviewAgent:
                 )
             else:
                 raw_prompt = get_dynamic_prompt()
-            escaped_prompt = raw_prompt.replace("{", "{{").replace("}", "}}")
-            _sessions[candidate_id] = [("system", escaped_prompt)]
+            _sessions[candidate_id] = [("system", raw_prompt)]
             
         if candidate_text:
             _sessions[candidate_id].append(("user", candidate_text))
@@ -118,34 +114,30 @@ class InterviewAgent:
             _sessions[candidate_id].append(("system", msg))
             
         try:
-            prompt = ChatPromptTemplate.from_messages(_sessions[candidate_id])
-            chain = prompt | self.llm
-            response = await chain.ainvoke({})
+            messages = []
+            for role, content in _sessions[candidate_id]:
+                if role == "system":
+                    messages.append(SystemMessage(content=content))
+                elif role == "user":
+                    messages.append(HumanMessage(content=content))
+                elif role == "assistant":
+                    messages.append(AIMessage(content=content))
+            
+            response = await self.llm.ainvoke(messages)
             reply_json = response.content
             _sessions[candidate_id].append(("assistant", reply_json))
             
             result = json.loads(reply_json)
-            # Dynamic time limit calculation based on characteristics
             inp_type = result.get("input_type", "voice")
             text_to_speak = result.get("text_to_speak", "")
             
-            # Dynamic rules:
-            if inp_type == "text":
-                limit = 90
-            elif inp_type in ("multiple_choice", "checkbox"):
-                limit = 45
-            else:
-                limit = base_time_limit
-
-            # Extra time for long strings
+            limit = 90 if inp_type == "text" else (45 if inp_type in ("multiple_choice", "checkbox") else base_limit)
             if len(text_to_speak) > 100:
                 limit += 15
 
             result["question_time_limit"] = limit
             return result
         except Exception as e:
-            import traceback
-            traceback.print_exc()
             print(f"Agent error: {e}")
             return {
                 "text_to_speak": f"I'm sorry, I'm having trouble processing that. Error: {str(e)}",
@@ -156,7 +148,6 @@ class InterviewAgent:
 
 class ComplianceAnalystAgent:
     """Agent orchestrator for compiling compliance review recommendations."""
-
     def __init__(self):
         self.llm = ChatGroq(
             groq_api_key=settings.groq_api_key,
@@ -228,16 +219,12 @@ CRITICAL: Do NOT use markdown headers or formatting like '##' or '**'. Use CAPIT
                 "rules": rules,
                 "transcript": transcript_text
             })
-            cleaned = response.content.replace("**", "").replace("##", "").replace("#", "")
-            return cleaned
+            return response.content.replace("**", "").replace("##", "").replace("#", "")
         except Exception as e:
             return f"Analysis generation failed: {e}"
 
-# Facade functions matching existing codebase API signature
 async def generate_agent_response(candidate_id: str, candidate_text: str) -> dict:
-    agent = InterviewAgent()
-    return await agent.get_response(candidate_id, candidate_text)
+    return await InterviewAgent().get_response(candidate_id, candidate_text)
 
 async def generate_compliance_analysis(candidate_id: str, violations_summary: dict) -> str:
-    agent = ComplianceAnalystAgent()
-    return await agent.analyze(candidate_id, violations_summary)
+    return await ComplianceAnalystAgent().analyze(candidate_id, violations_summary)

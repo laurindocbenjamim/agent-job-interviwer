@@ -61,6 +61,7 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
         self.channel_ref = channel_ref
         self.audio_buffer = bytearray()
         self.is_processing = False
+        self.frame_count = 0
         
     async def process_speech(self):
         """Process buffered speech when enough has accumulated."""
@@ -71,9 +72,27 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
         # 1. Transcribe audio
         text = await transcribe_audio(audio_data)
         if text.strip():
+            from src.domains.admin.router import admin_connections
+            
+            # Broadcast candidate text to admins
+            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
+                payload = {"candidate_text": text}
+                for ws in admin_connections[self.candidate_id]:
+                    asyncio.create_task(ws.send_json(payload))
+            
             # 2. Get LLM response
             response = await generate_agent_response(self.candidate_id, text)
             text_to_speak = response.get("text_to_speak", "")
+            current_topic = response.get("current_topic", "")
+            
+            # Broadcast agent text and topic to admins
+            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
+                payload = {
+                    "agent_text": text_to_speak,
+                    "current_topic": current_topic
+                }
+                for ws in admin_connections[self.candidate_id]:
+                    asyncio.create_task(ws.send_json(payload))
             
             # Send text over data channel
             channel = self.channel_ref.get("channel")
@@ -94,6 +113,20 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
 
     async def recv(self):
         frame = await self.track.recv()
+        
+        self.frame_count += 1
+        if self.frame_count % 5 == 0:
+            audio_bytes = frame.planes[0].to_bytes()
+            if audio_bytes:
+                audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
+                if len(audio_array) > 0:
+                    rms = np.sqrt(np.mean(audio_array.astype(np.float32)**2))
+                    from src.domains.admin.router import admin_connections
+                    if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
+                        payload = {"audio_level": float(rms)}
+                        for ws in admin_connections[self.candidate_id]:
+                            asyncio.create_task(ws.send_json(payload))
+
         # Collect audio
         if not self.is_processing:
             # We extract raw bytes. This is simplified, real implementations 

@@ -189,8 +189,23 @@ async def get_all_candidates():
         "interview_duration_minutes": c.interview_duration_minutes
     } for c in configs]
 
+class DeleteCandidatesSchema(BaseModel):
+    candidate_ids: list[str]
+
+@router.delete("/candidates")
+async def delete_candidates(payload: DeleteCandidatesSchema):
+    """Deletes one or more candidates."""
+    from src.shared.postgres_db import delete_postgres_configs
+    await delete_postgres_configs(payload.candidate_ids)
+    return {"status": "success", "message": f"{len(payload.candidate_ids)} candidates deleted successfully."}
+
 @router.get("/candidates-directory", response_class=HTMLResponse)
 async def candidates_directory():
     """Serves the candidates directory HTML page."""
     return HTMLResponse(content=jinja_env.get_template("admin_candidates.html").render())
+
+@router.get("/voice-cloning", response_class=HTMLResponse)
+async def voice_cloning_page():
+    """Serves the voice cloning studio HTML page."""
+    return HTMLResponse(content=jinja_env.get_template("admin_voice_cloning.html").render())
 

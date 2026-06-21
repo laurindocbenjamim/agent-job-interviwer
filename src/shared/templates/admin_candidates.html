@@ -290,18 +290,24 @@
                 }
 
                 let html = `
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Candidate Name</th>
-                                <th>Job Specialty</th>
-                                <th>Duration</th>
-                                <th>Questions</th>
-                                <th>Status</th>
-                                <th style="text-align:right;">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
+                    <div style="margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem;">
+                        <input type="text" id="search-candidates" placeholder="Search by name or specialty..." onkeyup="filterCandidates()" style="padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); outline: none; width: 100%; max-width: 400px; font-family: inherit; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--glass-border)'">
+                        <button onclick="deleteSelected()" class="action-btn" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-red); color: var(--text-primary); white-space: nowrap;">Delete Selected 🗑️</button>
+                    </div>
+                    <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--glass-border); border-radius: 10px; background: rgba(0, 0, 0, 0.2);">
+                        <table id="candidates-table" style="margin-top: 0; width: 100%; border-collapse: collapse;">
+                            <thead style="position: sticky; top: 0; background: rgba(20, 20, 20, 0.95); z-index: 1; backdrop-filter: blur(8px);">
+                                <tr>
+                                    <th style="width: 40px; padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);"><input type="checkbox" id="select-all" onclick="toggleSelectAll()"></th>
+                                    <th style="padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Candidate Name</th>
+                                    <th style="padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Job Specialty</th>
+                                    <th style="padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Duration</th>
+                                    <th style="padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Questions</th>
+                                    <th style="padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Status</th>
+                                    <th style="text-align:right; padding: 1rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
                 `;
 
                 candidates.forEach(c => {
@@ -309,6 +315,7 @@
                     const statusText = c.is_active ? 'Active' : 'Inactive';
                     html += `
                         <tr>
+                            <td><input type="checkbox" class="candidate-checkbox" value="${c.candidate_id}"></td>
                             <td style="font-weight: 500;">${c.candidate_name || 'N/A'}</td>
                             <td style="color: var(--text-secondary);">${c.job_specialty || 'N/A'}</td>
                             <td>${c.interview_duration_minutes} min</td>
@@ -317,16 +324,78 @@
                             <td class="actions-cell">
                                 <a href="/interview/${c.candidate_id}" target="_blank" class="action-link console">Console 🔗</a>
                                 <button onclick="monitorCandidate('${c.candidate_id}')" class="action-btn monitor">Monitor 👁️</button>
+                                <button onclick="deleteCandidate('${c.candidate_id}')" class="action-btn" style="background: rgba(239, 68, 68, 0.1); border: 1px solid var(--accent-red); color: var(--text-primary);">Delete</button>
                             </td>
                         </tr>
                     `;
                 });
 
-                html += '</tbody></table>';
+                html += '</tbody></table></div>';
                 container.innerHTML = html;
             } catch (e) {
                 console.error("Error loading candidates", e);
                 document.getElementById('candidates-table-container').innerHTML = '<div style="color:var(--accent-red); text-align:center; padding:2rem;">Failed to load candidate profiles.</div>';
+            }
+        }
+
+        function filterCandidates() {
+            const input = document.getElementById('search-candidates');
+            if (!input) return;
+            const filter = input.value.toLowerCase();
+            const table = document.getElementById('candidates-table');
+            if (!table) return;
+            const trs = table.getElementsByTagName('tr');
+
+            for (let i = 1; i < trs.length; i++) {
+                const tr = trs[i];
+                const tdName = tr.getElementsByTagName('td')[1];
+                const tdSpecialty = tr.getElementsByTagName('td')[2];
+                if (tdName && tdSpecialty) {
+                    const nameText = tdName.textContent || tdName.innerText;
+                    const specialtyText = tdSpecialty.textContent || tdSpecialty.innerText;
+                    if (nameText.toLowerCase().includes(filter) || specialtyText.toLowerCase().includes(filter)) {
+                        tr.style.display = "";
+                    } else {
+                        tr.style.display = "none";
+                    }
+                }
+            }
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('.candidate-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        async function deleteCandidate(id) {
+            if (!confirm("Are you sure you want to delete this candidate?")) return;
+            await deleteCandidates([id]);
+        }
+
+        async function deleteSelected() {
+            const checkboxes = document.querySelectorAll('.candidate-checkbox:checked');
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            if (ids.length === 0) {
+                alert("Please select at least one candidate to delete.");
+                return;
+            }
+            if (!confirm(`Are you sure you want to delete ${ids.length} selected candidates?`)) return;
+            await deleteCandidates(ids);
+        }
+
+        async function deleteCandidates(ids) {
+            try {
+                const res = await fetch('/admin/candidates', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ candidate_ids: ids })
+                });
+                if (!res.ok) throw new Error("Failed to delete candidates");
+                loadCandidates();
+            } catch (e) {
+                console.error("Error deleting candidates", e);
+                alert("Failed to delete candidates.");
             }
         }
 

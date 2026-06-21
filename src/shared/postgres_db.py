@@ -130,3 +130,13 @@ async def get_all_postgres_configs():
     async with AsyncSessionLocal() as session:
         result = await session.execute(select(InterviewConfig))
         return result.scalars().all()
+
+async def delete_postgres_configs(candidate_ids: list[str]):
+    """Deletes one or more candidate configurations from Postgres/SQLite."""
+    from sqlalchemy import delete
+    await ensure_db_initialized()
+    _, AsyncSessionLocal = get_engine_and_sessionmaker()
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            await session.execute(delete(InterviewConfig).where(InterviewConfig.candidate_id.in_(candidate_ids)))
+            await session.commit()

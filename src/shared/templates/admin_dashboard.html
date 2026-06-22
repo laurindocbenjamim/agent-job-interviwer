@@ -773,11 +773,16 @@
 
                 if (data.action === 'live_transcript') {
                     const speechEl = document.getElementById('live-candidate-speech');
-                    speechEl.textContent = data.text || "Candidate is silent...";
-                    if (!data.is_final) {
-                        speechEl.style.opacity = '0.7';
+                    
+                    if (data.is_final) {
+                        // Append to permanent log
+                        appendTranscript('candidate', data.text);
+                        speechEl.textContent = "Candidate is silent...";
+                        speechEl.style.opacity = '0.5';
                     } else {
-                        speechEl.style.opacity = '1';
+                        // Show in live preview
+                        speechEl.textContent = data.text || "Candidate is silent...";
+                        speechEl.style.opacity = '0.7';
                     }
                 }
 

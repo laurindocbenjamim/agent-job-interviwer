@@ -354,13 +354,14 @@ async def force_submit_answer(candidate_id: str, request: SubmitRequest):
                 print(f"Error sending datachannel message: {e}")
                 
         # Send Audio via TTS track
-        text_to_speak = response.get("text_to_speak", "")
         if text_to_speak:
             pcm_bytes = await generate_speech(text_to_speak)
             await session["tts_track"].add_audio(pcm_bytes)
             
-            from src.shared.redis_client import redis_client
-            await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps({"agent_text": text_to_speak}))
+    text_to_speak = response.get("text_to_speak", "")
+    if text_to_speak:
+        from src.shared.redis_client import redis_client
+        await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps({"agent_text": text_to_speak}))
             
     return response
 

@@ -185,8 +185,65 @@
         /* Adjust phase layout */
         .phase { display: none; }
         .phase.active { display: block; }
-
-    </style>
+        
+        /* Responsive Design */
+        @media (max-width: 1200px) {
+            .interview-grid {
+                grid-template-columns: 1fr 300px;
+                grid-template-rows: auto 1fr;
+                height: auto;
+                max-height: none;
+            }
+            .sidebar-left {
+                grid-column: 1 / -1;
+                flex-direction: row;
+                height: 250px;
+            }
+            .avatar-wrapper {
+                height: 100%;
+            }
+            .video-wrapper.small {
+                height: 100%;
+                width: 300px;
+                flex-shrink: 0;
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .interview-grid {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+            .sidebar-left {
+                flex-direction: column;
+                height: auto;
+            }
+            .video-wrapper.small {
+                width: 100%;
+                height: 250px;
+            }
+            .avatar-wrapper {
+                height: 300px;
+            }
+            .center-stage {
+                order: 3;
+            }
+            .side-widgets {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 1rem;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .side-widgets {
+                grid-template-columns: 1fr;
+            }
+            .question-body {
+                font-size: 1.2rem;
+                padding: 1rem;
+            }
+        }
 </head>
 <body>
     <!-- Header -->

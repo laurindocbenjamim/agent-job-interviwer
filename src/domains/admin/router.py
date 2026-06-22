@@ -49,21 +49,70 @@ async def get_active_sessions():
 
 @router.websocket("/ws/interview/{candidate_id}")
 async def admin_interview_stream(websocket: WebSocket, candidate_id: str):
-    """WebSocket stream for admin to receive real-time video and CV metrics."""
+    """WebSocket stream for admin to receive real-time video and CV metrics via Redis Pub/Sub."""
     await websocket.accept()
+    
     if candidate_id not in admin_connections:
         admin_connections[candidate_id] = []
     admin_connections[candidate_id].append(websocket)
+
+    from src.shared.redis_client import redis_client
+    import asyncio
+    
+    # Send cached device telemetry if it exists
+    device_data = await redis_client.get(f"telemetry:device:{candidate_id}")
+    if device_data:
+        try:
+            await websocket.send_text(device_data.decode('utf-8') if isinstance(device_data, bytes) else device_data)
+        except Exception:
+            pass
+
+    # Send current question from transcript
+    from src.domains.interviews.agent import _sessions
+    import json
+    transcript = _sessions.get(candidate_id, [])
+    if transcript:
+        last_agent = None
+        for msg in transcript:
+            if isinstance(msg, tuple) and len(msg) >= 2:
+                if msg[0] == "assistant":
+                    try:
+                        # Extract the actual text_to_speak from the JSON payload if possible
+                        data = json.loads(msg[1])
+                        last_agent = data.get("text_to_speak", "")
+                    except Exception:
+                        last_agent = msg[1]
+        if last_agent:
+            try:
+                await websocket.send_text(json.dumps({"agent_text": last_agent}))
+            except Exception:
+                pass
+            
+    pubsub = redis_client.pubsub()
+    await pubsub.subscribe(f"admin_telemetry:{candidate_id}")
+    
+    async def read_from_redis():
+        async for message in pubsub.listen():
+            if message["type"] == "message":
+                try:
+                    await websocket.send_text(message["data"])
+                except Exception:
+                    break
+
+    task = asyncio.create_task(read_from_redis())
     
     try:
         while True:
             # Keep connection alive
             await websocket.receive_text()
     except WebSocketDisconnect:
-        if websocket in admin_connections.get(candidate_id, []):
+        pass
+    finally:
+        task.cancel()
+        if candidate_id in admin_connections and websocket in admin_connections[candidate_id]:
             admin_connections[candidate_id].remove(websocket)
-        if not admin_connections.get(candidate_id):
-            admin_connections.pop(candidate_id, None)
+        await pubsub.unsubscribe(f"admin_telemetry:{candidate_id}")
+        await pubsub.close()
 
 from pydantic import BaseModel
 from src.shared.redis_client import redis_client
@@ -75,6 +124,10 @@ class CVSettings(BaseModel):
     gaze_min: float = 0.025
     gaze_max: float = 0.055
 
+class AudioSettings(BaseModel):
+    mic_gain: float
+    noise_thresh: float = 0.055
+
 @router.post("/cv-settings/{candidate_id}")
 async def update_cv_settings(candidate_id: str, settings: CVSettings):
     """Updates CV thresholds for a candidate in Redis."""
@@ -83,6 +136,13 @@ async def update_cv_settings(candidate_id: str, settings: CVSettings):
     await redis_client.set(f"cv_threshold:brightness:{candidate_id}", settings.brightness_thresh, ex=7200)
     await redis_client.set(f"cv_threshold:gaze_min:{candidate_id}", settings.gaze_min, ex=7200)
     await redis_client.set(f"cv_threshold:gaze_max:{candidate_id}", settings.gaze_max, ex=7200)
+    return {"status": "success"}
+
+@router.post("/audio-settings/{candidate_id}")
+async def update_audio_settings(candidate_id: str, settings: AudioSettings):
+    """Updates Audio settings for a candidate in Redis."""
+    await redis_client.set(f"cv_threshold:mic_gain:{candidate_id}", settings.mic_gain, ex=7200)
+    await redis_client.set(f"cv_threshold:noise_thresh:{candidate_id}", settings.noise_thresh, ex=7200)
     return {"status": "success"}
 
 @router.post("/voice/clone")

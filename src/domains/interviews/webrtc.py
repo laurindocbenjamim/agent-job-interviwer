@@ -72,13 +72,9 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
         # 1. Transcribe audio
         text = await transcribe_audio(audio_data)
         if text.strip():
-            from src.domains.admin.router import admin_connections
-            
-            # Broadcast candidate text to admins
-            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
-                payload = {"candidate_text": text}
-                for ws in admin_connections[self.candidate_id]:
-                    asyncio.create_task(ws.send_json(payload))
+            from src.shared.redis_client import redis_client
+            import json
+            await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps({"candidate_text": text}))
             
             # 2. Get LLM response
             response = await generate_agent_response(self.candidate_id, text)
@@ -86,13 +82,11 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
             current_topic = response.get("current_topic", "")
             
             # Broadcast agent text and topic to admins
-            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
-                payload = {
+            if text_to_speak:
+                await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps({
                     "agent_text": text_to_speak,
                     "current_topic": current_topic
-                }
-                for ws in admin_connections[self.candidate_id]:
-                    asyncio.create_task(ws.send_json(payload))
+                }))
             
             # Send text over data channel
             channel = self.channel_ref.get("channel")
@@ -121,11 +115,10 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
                 audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
                 if len(audio_array) > 0:
                     rms = np.sqrt(np.mean(audio_array.astype(np.float32)**2))
-                    from src.domains.admin.router import admin_connections
-                    if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
-                        payload = {"audio_level": float(rms)}
-                        for ws in admin_connections[self.candidate_id]:
-                            asyncio.create_task(ws.send_json(payload))
+                    from src.shared.redis_client import redis_client
+                    import json
+                    payload = {"audio_level": float(rms)}
+                    asyncio.create_task(redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps(payload)))
 
         # Collect audio
         if not self.is_processing:
@@ -183,32 +176,22 @@ class InterviewVideoStreamTrack(VideoStreamTrack):
             )
             
             # Broadcast to admins if any are connected
-            from src.domains.admin.router import admin_connections
+            from src.shared.redis_client import redis_client
             import cv2
             import base64
+            import json
             
-            if self.candidate_id in admin_connections and admin_connections[self.candidate_id]:
-                # encode frame to jpeg
-                _, buffer = cv2.imencode('.jpg', annotated_frame)
-                b64_image = base64.b64encode(buffer).decode('utf-8')
-                
-                payload = {
-                    "image": f"data:image/jpeg;base64,{b64_image}",
-                    "details": details,
-                    "video_quality": video_quality,
-                    "is_violation": is_violation
-                }
-                
-                disconnected_admins = []
-                for ws in admin_connections[self.candidate_id]:
-                    try:
-                        # Send without awaiting if possible or use a safe method, 
-                        # but sending json over websocket is async so we await
-                        await ws.send_json(payload)
-                    except Exception as e:
-                        disconnected_admins.append(ws)
-                for ws in disconnected_admins:
-                    admin_connections[self.candidate_id].remove(ws)
+            # encode frame to jpeg
+            _, buffer = cv2.imencode('.jpg', annotated_frame)
+            b64_image = base64.b64encode(buffer).decode('utf-8')
+            
+            payload = {
+                "image": f"data:image/jpeg;base64,{b64_image}",
+                "details": details,
+                "video_quality": video_quality,
+                "is_violation": is_violation
+            }
+            await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps(payload))
             
             # Evaluate the frame (logs telemetry and checks strike count)
             # This triggers MongoDB writes and Redis updates asynchronously.

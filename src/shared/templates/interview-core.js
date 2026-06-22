@@ -140,16 +140,70 @@ function initAudioMeter(stream) {
 
     // Global tracking flag for speech detection
     State.hasSpoken = false;
+    State.currentAudioLevel = 0;
+    
+    // Initialize Web Speech API for live transcription
+    if ('webkitSpeechRecognition' in window) {
+        State.recognition = new webkitSpeechRecognition();
+        State.recognition.continuous = true;
+        State.recognition.interimResults = true;
+        State.recognition.lang = 'en-US';
+        
+        State.recognition.onresult = (event) => {
+            let interimTranscript = '';
+            let finalTranscript = '';
+            
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                if (event.results[i].isFinal) {
+                    finalTranscript += event.results[i][0].transcript;
+                } else {
+                    interimTranscript += event.results[i][0].transcript;
+                }
+            }
+            
+            // Send transcription to backend for admin dashboard
+            const transcript = finalTranscript || interimTranscript;
+            if (transcript.trim().length > 0 && State.ws?.readyState === WebSocket.OPEN) {
+                State.ws.send(JSON.stringify({ 
+                    action: "live_transcript", 
+                    text: transcript,
+                    is_final: !!finalTranscript
+                }));
+            }
+        };
+        
+        State.recognition.onerror = (e) => {
+            console.warn('[Speech] Error:', e.error);
+        };
+        
+        State.recognition.onend = () => {
+            // Restart if the interview is still active
+            if (State.ws?.readyState === WebSocket.OPEN) {
+                try { State.recognition.start(); } catch (e) {}
+            }
+        };
+        
+        try { State.recognition.start(); } catch (e) {}
+    }
 
     setInterval(() => {
         if (!State.analyser) return;
         State.analyser.getByteFrequencyData(dataArray);
         let sum = 0;
         for (let i = 0; i < dataArray.length; i++) sum += dataArray[i];
-        const avg = sum / dataArray.length;
+        let avg = sum / dataArray.length;
+        
+        // Apply Admin-Controlled Mic Gain
+        avg = avg * (State.micGain !== undefined ? State.micGain : 1.0);
+        
+        // Apply Admin-Controlled Noise Threshold Gate
+        const noiseThresh = State.noiseThresh !== undefined ? State.noiseThresh : 2.0;
+        if (avg < noiseThresh) avg = 0;
+
         const pct = Math.min((avg / 80) * 100, 100);
 
         if (meterFill) meterFill.style.width = pct + '%';
+        State.currentAudioLevel = pct;
         if (voiceStatus) {
             if (avg > 2 && avg < 15) {
                 voiceStatus.textContent = 'Too Soft';
@@ -209,6 +263,10 @@ function connectWebSocket() {
     State.ws.onmessage = (event) => {
         const data = JSON.parse(event.data);
         updateInterviewStatus(data);
+        
+        // Sync Admin Audio Settings
+        if (data.mic_gain !== undefined) State.micGain = data.mic_gain;
+        if (data.noise_thresh !== undefined) State.noiseThresh = data.noise_thresh;
 
         if (data.action === 'warn' || data.action === 'terminate') {
             State.violationsLog.push({
@@ -249,7 +307,7 @@ function startFrameStreaming() {
         if (State.ws?.readyState === WebSocket.OPEN && State.localStream) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
-            State.ws.send(JSON.stringify({ image: dataUrl }));
+            State.ws.send(JSON.stringify({ image: dataUrl, audio_level: State.currentAudioLevel }));
         }
     }, 400);
 }
@@ -407,4 +465,38 @@ document.addEventListener('DOMContentLoaded', () => {
         window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); };
     }
     setTimeout(initAvatar, 500);
+    captureDeviceTelemetry();
 });
+
+async function captureDeviceTelemetry() {
+    let deviceStr = 'Unknown Device';
+    const ua = navigator.userAgent;
+    if (/mobile/i.test(ua)) deviceStr = 'Mobile';
+    else if (/Mac/i.test(ua)) deviceStr = 'Mac Desktop';
+    else if (/Win/i.test(ua)) deviceStr = 'Windows Desktop';
+    else if (/Linux/i.test(ua)) deviceStr = 'Linux Desktop';
+    else deviceStr = 'Computer';
+
+    let locationStr = 'Unknown Location';
+    try {
+        const response = await fetch('https://ipapi.co/json/');
+        if (response.ok) {
+            const data = await response.json();
+            if (data.city && data.country_name) {
+                locationStr = `${data.city}, ${data.country_name}`;
+            }
+        }
+    } catch (err) {
+        console.warn('Could not fetch location telemetry:', err);
+    }
+
+    try {
+        await fetch(`/interview/${State.candidateId}/telemetry/device`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ device: deviceStr, location: locationStr })
+        });
+    } catch (err) {
+        console.warn('Could not send device telemetry to backend:', err);
+    }
+}

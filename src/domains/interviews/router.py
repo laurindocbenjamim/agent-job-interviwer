@@ -34,12 +34,33 @@ async def serve_interview_console(candidate_id: str):
         speech_lang = config.speech_language
         text_lang = config.text_language
     else:
-        duration_mins = settings.interview_duration_minutes
-        gender = settings.avatar_gender.lower()
-        time_limit = settings.question_time_limit_seconds
-        is_active = True
-        speech_lang = "en-US"
-        text_lang = "en"
+        # User requested: "if not found, display the message 'Interview not Available'"
+        html_content = """
+        <!DOCTYPE html>
+        <html lang="en" data-theme="dark">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Interview Not Available</title>
+            <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { font-family: 'Outfit', sans-serif; background-color: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                .card { background: rgba(255, 255, 255, 0.05); padding: 3rem; border-radius: 1rem; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
+                .icon { font-size: 4rem; margin-bottom: 1rem; display: block; }
+                h1 { margin: 0 0 0.5rem 0; font-size: 2rem; color: #ef4444; }
+                p { margin: 0; color: #94a3b8; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <span class="icon">🚫</span>
+                <h1>Interview Not Available</h1>
+                <p>The requested interview session could not be found or has expired.</p>
+            </div>
+        </body>
+        </html>
+        """
+        return HTMLResponse(content=html_content, status_code=404)
 
     try:
         template = jinja_env.get_template("interview.html")
@@ -126,6 +147,24 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                 data = await websocket.receive_text()
                 payload = json.loads(data)
 
+                # Handle live transcript
+                from src.domains.admin.router import admin_connections
+                if payload.get("action") == "live_transcript":
+                    transcript_payload = {
+                        "action": "live_transcript",
+                        "text": payload.get("text", ""),
+                        "is_final": payload.get("is_final", False)
+                    }
+                    disconnected_admins = []
+                    for admin_ws in admin_connections.get(candidate_id, []):
+                        try:
+                            await admin_ws.send_json(transcript_payload)
+                        except Exception:
+                            disconnected_admins.append(admin_ws)
+                    for disconnected in disconnected_admins:
+                        admin_connections[candidate_id].remove(disconnected)
+                    continue
+
                 if "image" not in payload:
                     continue
 
@@ -141,18 +180,24 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                 if frame is None:
                     continue
 
+                audio_level = payload.get("audio_level", 0.0)
+
                 from src.shared.redis_client import redis_client
                 yaw_val = await redis_client.get(f"cv_threshold:yaw:{candidate_id}")
                 pitch_val = await redis_client.get(f"cv_threshold:pitch:{candidate_id}")
                 bright_val = await redis_client.get(f"cv_threshold:brightness:{candidate_id}")
                 gaze_min_val = await redis_client.get(f"cv_threshold:gaze_min:{candidate_id}")
                 gaze_max_val = await redis_client.get(f"cv_threshold:gaze_max:{candidate_id}")
+                mic_gain_val = await redis_client.get(f"cv_threshold:mic_gain:{candidate_id}")
+                noise_thresh_val = await redis_client.get(f"cv_threshold:noise_thresh:{candidate_id}")
 
                 yaw_thresh = float(yaw_val) if yaw_val is not None else 20.0
                 pitch_thresh = float(pitch_val) if pitch_val is not None else 20.0
                 brightness_thresh = float(bright_val) if bright_val is not None else 90.0
                 gaze_min = float(gaze_min_val) if gaze_min_val is not None else 0.025
                 gaze_max = float(gaze_max_val) if gaze_max_val is not None else 0.055
+                mic_gain = float(mic_gain_val) if mic_gain_val is not None else 1.0
+                noise_thresh = float(noise_thresh_val) if noise_thresh_val is not None else 2.0
 
                 is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(
                     analyze_frame, frame, True, yaw_thresh, pitch_thresh, brightness_thresh, gaze_min, gaze_max
@@ -164,6 +209,10 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                     details=details,
                     video_quality=video_quality,
                 )
+                
+                # Append audio configuration to sync back to candidate JS
+                response_data["mic_gain"] = mic_gain
+                response_data["noise_thresh"] = noise_thresh
 
                 # Broadcast to admins if any are connected
                 from src.domains.admin.router import admin_connections
@@ -175,7 +224,8 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
                         "details": details,
                         "video_quality": video_quality,
                         "is_violation": is_violation,
-                        "current_strikes": response_data.get("current_strikes", 0)
+                        "current_strikes": response_data.get("current_strikes", 0),
+                        "audio_level": audio_level
                     }
                     disconnected_admins = []
                     for admin_ws in admin_connections[candidate_id]:
@@ -309,16 +359,37 @@ async def force_submit_answer(candidate_id: str, request: SubmitRequest):
             pcm_bytes = await generate_speech(text_to_speak)
             await session["tts_track"].add_audio(pcm_bytes)
             
+            from src.shared.redis_client import redis_client
+            await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps({"agent_text": text_to_speak}))
+            
     return response
 
 @router.post("/interview/{candidate_id}/finalize")
 async def finalize_interview(candidate_id: str):
-    """Saves the interview data to MongoDB and cleans up the session."""
-    session_data = _sessions.get(candidate_id, [])
-    await save_interview_session(candidate_id, session_data)
+    """Ends the interview and saves the final transcript."""
+    from src.shared.database import save_interview_session
     
-    # Clean up memory
-    if candidate_id in _sessions:
-        del _sessions[candidate_id]
+    session = active_sessions.pop(candidate_id, None)
+    if not session:
+        return {"status": "error", "message": "Session not found"}
         
-    return {"status": "success", "message": "Interview finalized and saved to MongoDB"}
+    transcript = session.get("transcript", [])
+    await save_interview_session(candidate_id, transcript)
+    
+    return {"status": "success", "message": "Interview finalized"}
+
+from pydantic import BaseModel
+
+class DeviceTelemetry(BaseModel):
+    device: str
+    location: str
+
+@router.post("/interview/{candidate_id}/telemetry/device")
+async def receive_device_telemetry(candidate_id: str, payload: DeviceTelemetry):
+    """Receives device and location telemetry from the candidate's browser and pushes to admin feed."""
+    from src.shared.redis_client import redis_client
+    import json
+    data = {"action": "telemetry", "device": payload.device, "location": payload.location}
+    await redis_client.set(f"telemetry:device:{candidate_id}", json.dumps(data), ex=7200)
+    await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps(data))
+    return {"status": "success"}

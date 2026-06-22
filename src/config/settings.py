@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     jwt_secret: str = Field(..., alias="JWT_SECRET")
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     secure_cookie: bool = Field(False, alias="SECURE_COOKIE")
+    cors_origins: str = Field("http://localhost:5173,http://localhost:3000,http://localhost:3001", alias="CORS_ORIGINS")
 
     # Interview configuration
     interview_duration_minutes: int = Field(30, alias="INTERVIEW_DURATION_MINUTES")

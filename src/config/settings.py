@@ -13,7 +13,8 @@ class Settings(BaseSettings):
     mongodb_uri: str = Field(..., alias="MONGODB_URI")
     mongodb_db_name: str = Field("nutrisentinel_agent_ai", alias="MONGODB_DB_NAME")
     mongodb_collection: str = Field("analysis", alias="MONGODB_COLLECTION")
-    redis_url: str = Field("redis://localhost:6379/0", alias="REDIS_URL")
+    upstash_redis_rest_url: str = Field(..., alias="UPSTASH_REDIS_REST_URL")
+    upstash_redis_rest_token: str = Field(..., alias="UPSTASH_REDIS_REST_TOKEN")
     postgres_url: Optional[str] = Field(None, alias="POSTGRES_URL")
 
     # Sentry DSN

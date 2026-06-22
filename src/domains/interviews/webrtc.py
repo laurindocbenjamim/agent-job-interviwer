@@ -72,9 +72,15 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
         # 1. Transcribe audio
         text = await transcribe_audio(audio_data)
         if text.strip():
-            from src.shared.redis_client import redis_client
             import json
-            await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps({"candidate_text": text}))
+            from src.domains.admin.router import admin_connections
+            if self.candidate_id in admin_connections:
+                payload = json.dumps({"candidate_text": text})
+                for admin_ws in admin_connections[self.candidate_id]:
+                    try:
+                        asyncio.create_task(admin_ws.send_text(payload))
+                    except Exception:
+                        pass
             
             # 2. Get LLM response
             response = await generate_agent_response(self.candidate_id, text)
@@ -83,10 +89,17 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
             
             # Broadcast agent text and topic to admins
             if text_to_speak:
-                await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps({
-                    "agent_text": text_to_speak,
-                    "current_topic": current_topic
-                }))
+                from src.domains.admin.router import admin_connections
+                if self.candidate_id in admin_connections:
+                    payload = json.dumps({
+                        "agent_text": text_to_speak,
+                        "current_topic": current_topic
+                    })
+                    for admin_ws in admin_connections[self.candidate_id]:
+                        try:
+                            asyncio.create_task(admin_ws.send_text(payload))
+                        except Exception:
+                            pass
             
             # Send text over data channel
             channel = self.channel_ref.get("channel")
@@ -115,10 +128,15 @@ class InterviewAudioStreamTrack(AudioStreamTrack):
                 audio_array = np.frombuffer(audio_bytes, dtype=np.int16)
                 if len(audio_array) > 0:
                     rms = np.sqrt(np.mean(audio_array.astype(np.float32)**2))
-                    from src.shared.redis_client import redis_client
+                    from src.domains.admin.router import admin_connections
                     import json
-                    payload = {"audio_level": float(rms)}
-                    asyncio.create_task(redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps(payload)))
+                    payload = json.dumps({"audio_level": float(rms)})
+                    if self.candidate_id in admin_connections:
+                        for admin_ws in admin_connections[self.candidate_id]:
+                            try:
+                                asyncio.create_task(admin_ws.send_text(payload))
+                            except Exception:
+                                pass
 
         # Collect audio
         if not self.is_processing:
@@ -175,8 +193,7 @@ class InterviewVideoStreamTrack(VideoStreamTrack):
                 analyze_frame, img, True, yaw_thresh, pitch_thresh, brightness_thresh, gaze_min, gaze_max
             )
             
-            # Broadcast to admins if any are connected
-            from src.shared.redis_client import redis_client
+            from src.domains.admin.router import admin_connections
             import cv2
             import base64
             import json
@@ -185,13 +202,18 @@ class InterviewVideoStreamTrack(VideoStreamTrack):
             _, buffer = cv2.imencode('.jpg', annotated_frame)
             b64_image = base64.b64encode(buffer).decode('utf-8')
             
-            payload = {
+            payload = json.dumps({
                 "image": f"data:image/jpeg;base64,{b64_image}",
                 "details": details,
                 "video_quality": video_quality,
                 "is_violation": is_violation
-            }
-            await redis_client.publish(f"admin_telemetry:{self.candidate_id}", json.dumps(payload))
+            })
+            if self.candidate_id in admin_connections:
+                for admin_ws in admin_connections[self.candidate_id]:
+                    try:
+                        asyncio.create_task(admin_ws.send_text(payload))
+                    except Exception:
+                        pass
             
             # Evaluate the frame (logs telemetry and checks strike count)
             # This triggers MongoDB writes and Redis updates asynchronously.

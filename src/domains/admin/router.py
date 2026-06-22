@@ -88,19 +88,6 @@ async def admin_interview_stream(websocket: WebSocket, candidate_id: str):
             except Exception:
                 pass
             
-    pubsub = redis_client.pubsub()
-    await pubsub.subscribe(f"admin_telemetry:{candidate_id}")
-    
-    async def read_from_redis():
-        async for message in pubsub.listen():
-            if message["type"] == "message":
-                try:
-                    await websocket.send_text(message["data"])
-                except Exception:
-                    break
-
-    task = asyncio.create_task(read_from_redis())
-    
     try:
         while True:
             # Keep connection alive
@@ -108,11 +95,8 @@ async def admin_interview_stream(websocket: WebSocket, candidate_id: str):
     except WebSocketDisconnect:
         pass
     finally:
-        task.cancel()
         if candidate_id in admin_connections and websocket in admin_connections[candidate_id]:
             admin_connections[candidate_id].remove(websocket)
-        await pubsub.unsubscribe(f"admin_telemetry:{candidate_id}")
-        await pubsub.close()
 
 from pydantic import BaseModel
 from src.shared.redis_client import redis_client

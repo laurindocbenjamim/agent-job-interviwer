@@ -360,8 +360,14 @@ async def force_submit_answer(candidate_id: str, request: SubmitRequest):
             
     text_to_speak = response.get("text_to_speak", "")
     if text_to_speak:
-        from src.shared.redis_client import redis_client
-        await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps({"agent_text": text_to_speak}))
+        from src.domains.admin.router import admin_connections
+        if candidate_id in admin_connections:
+            payload = json.dumps({"agent_text": text_to_speak})
+            for admin_ws in admin_connections[candidate_id]:
+                try:
+                    await admin_ws.send_text(payload)
+                except Exception:
+                    pass
             
     return response
 
@@ -392,5 +398,13 @@ async def receive_device_telemetry(candidate_id: str, payload: DeviceTelemetry):
     import json
     data = {"action": "telemetry", "device": payload.device, "location": payload.location}
     await redis_client.set(f"telemetry:device:{candidate_id}", json.dumps(data), ex=7200)
-    await redis_client.publish(f"admin_telemetry:{candidate_id}", json.dumps(data))
+    
+    from src.domains.admin.router import admin_connections
+    if candidate_id in admin_connections:
+        payload = json.dumps(data)
+        for admin_ws in admin_connections[candidate_id]:
+            try:
+                await admin_ws.send_text(payload)
+            except Exception:
+                pass
     return {"status": "success"}

@@ -278,11 +278,18 @@ function connectWebSocket() {
         }
 
         if (data.action === 'terminate') {
-            endInterview('terminated');
+            State.isFinished = true;
+            stopFrameStreaming();
         }
     };
 
     State.ws.onerror = () => console.warn('[WS] Connection error');
+    State.ws.onclose = () => {
+        console.warn('[WS] Disconnected. Reconnecting in 3 seconds...');
+        if (!State.isFinished) {
+            setTimeout(connectWebSocket, 3000);
+        }
+    };
 }
 
 function updateInterviewStatus(data) {

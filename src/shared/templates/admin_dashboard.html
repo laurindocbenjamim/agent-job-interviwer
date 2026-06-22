@@ -722,7 +722,7 @@
                 }
 
             } catch (e) {
-                console.error("Failed to fetch sessions", e);
+                // Silently ignore to avoid console spam if server restarts
             }
         }
 
@@ -739,7 +739,12 @@
             logEvent(`Initiating secure connection to stream ${id}...`);
             fetchSessions(); // update active state classes
             
+            connectAdminWebSocket(id);
+        }
+
+        function connectAdminWebSocket(id) {
             if (currentWs) {
+                currentWs.onclose = null; // Prevent retry loop on old socket
                 currentWs.close();
             }
 
@@ -808,10 +813,15 @@
 
             currentWs.onerror = () => logEvent('WebSocket connection error.', 'error');
             currentWs.onclose = () => {
-                logEvent('Stream disconnected by peer.', 'warn');
+                logEvent('Stream disconnected by peer. Retrying in 3s...', 'warn');
                 document.getElementById('no-video').style.display = 'flex';
                 document.getElementById('cv-feed').style.display = 'none';
                 document.getElementById('print-row').style.display = 'flex';
+                
+                // Auto-reconnect
+                if (activeSessionId === id) {
+                    setTimeout(() => connectAdminWebSocket(id), 3000);
+                }
             };
         }
 

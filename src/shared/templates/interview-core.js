@@ -166,6 +166,11 @@ function initAudioMeter(stream) {
                 }
             }
             
+            // Save to State for submission
+            if (finalTranscript) {
+                State.finalSpeechText = (State.finalSpeechText || '') + ' ' + finalTranscript;
+            }
+
             // Send transcription to backend for admin dashboard
             const transcript = finalTranscript || interimTranscript;
             if (transcript.trim().length > 0 && State.ws?.readyState === WebSocket.OPEN) {
@@ -182,8 +187,8 @@ function initAudioMeter(stream) {
         };
         
         State.recognition.onend = () => {
-            // Restart if the interview is still active
-            if (State.ws?.readyState === WebSocket.OPEN) {
+            // Restart if the interview is not finished
+            if (!State.isFinished) {
                 try { State.recognition.start(); } catch (e) {}
             }
         };

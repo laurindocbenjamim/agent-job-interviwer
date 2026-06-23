@@ -764,6 +764,18 @@
                         audioDataPoints.shift();
                     }
                     drawWaveform();
+                    
+                    // Fallback visual indicator if SpeechRecognition is blocked by HTTP context
+                    const speechEl = document.getElementById('live-candidate-speech');
+                    if (speechEl) {
+                        if (data.audio_level > 15 && speechEl.textContent === "Candidate is silent...") {
+                            speechEl.textContent = "[Voice detected, no text transcript available]";
+                            speechEl.style.opacity = '0.7';
+                        } else if (data.audio_level <= 15 && speechEl.textContent === "[Voice detected, no text transcript available]") {
+                            speechEl.textContent = "Candidate is silent...";
+                            speechEl.style.opacity = '0.5';
+                        }
+                    }
                 }
 
                 if (data.candidate_text) {

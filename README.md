@@ -11,21 +11,35 @@ src/
 │   ├── __init__.py
 │   └── settings.py                  # Pydantic Settings (reads .env)
 ├── domains/
-│   └── interviews/                  # Bounded context
-│       ├── __init__.py
-│       ├── router.py                # HTTP + WebSocket routes
-│       ├── service.py               # Business logic / rules engine
-│       ├── schemas.py               # Pydantic models
-│       ├── video_analyzer.py        # MediaPipe Face Landmarker integration
-│       ├── audio_analyzer.py        # Audio volume evaluation (unused server-side)
-│       └── face_landmarker.task     # MediaPipe model (auto-downloaded)
+│   ├── interviews/                  # Interviews Bounded Context
+│   │   ├── router.py                # HTTP + WebSocket routes (thin)
+│   │   ├── service.py               # Business logic / rules engine
+│   │   ├── schemas.py               # Pydantic models
+│   │   ├── state.py                 # Runtime session state
+│   │   ├── websocket.py             # WebSocket handler
+│   │   ├── ai/                      # AI Agents feature
+│   │   │   ├── agent.py             # Interviewer agent
+│   │   │   ├── compliance_agent.py  # Compliance analyst
+│   │   │   └── tts.py               # Text-to-Speech
+│   │   ├── analysis/                # Analysis feature
+│   │   │   ├── video.py             # Video analysis (MediaPipe)
+│   │   │   ├── audio.py             # Audio analysis
+│   │   │   └── drawing.py           # Visualization utilities
+│   │   └── rtc/                     # WebRTC feature
+│   │       └── webrtc.py            # WebRTC tracks and signaling
+│   └── admin/                       # Admin Bounded Context
+│       ├── router.py                # Admin HTTP + WebSocket routes
+│       ├── service.py               # Admin business logic
+│       ├── schemas.py               # Admin Pydantic models
+│       ├── state.py                 # Admin WebSocket connections
+│       └── models.py                # Admin database models
 └── shared/
     ├── __init__.py
     ├── database.py                  # MongoDB (Motor) async client
+    ├── postgres_db.py               # PostgreSQL (SQLAlchemy) async client
     ├── redis_client.py              # Redis async client (strike tracking)
     ├── sentry.py                    # Sentry initialization
-    └── templates/
-        └── interview.html           # Frontend dashboard
+    └── templates/                   # Jinja2 HTML templates
 ```
 
 ## Functional Requirements
@@ -71,11 +85,16 @@ src/
 | Face Tracking | MediaPipe Face Landmarker |
 | Computer Vision | OpenCV |
 | Database | MongoDB (Motor async driver) |
-| Cache/State | Redis (redis.asyncio) |
-| WebSockets | FastAPI native WebSocket |
+| Relational DB | PostgreSQL (SQLAlchemy async + asyncpg) |
+| Cache/State | Redis (Upstash HTTP client) |
+| WebRTC | aiortc |
+| TTS | Coqui TTS (XTTS-v2) |
+| STT | Groq (Whisper) |
+| LLM Agents | LangChain + Groq (Llama 3.1) |
 | Error Tracking | Sentry |
 | Validation | Pydantic v2 + Pydantic Settings |
 | Templating | Jinja2 |
+| Containerization | Docker + Docker Compose |
 | Testing | Pytest, pytest-asyncio, httpx |
 
 ## Endpoints
@@ -232,37 +251,95 @@ Set environment variables in `.env`:
 ### Prerequisites
 
 - Python 3.10+
+- Docker & Docker Compose (recommended for infrastructure)
 - MongoDB instance (local or Atlas)
 - Redis instance (local or remote)
 
-### Setup
+---
+
+### Option 1: Run with Docker Compose (Recommended)
+
+Docker Compose spins up PostgreSQL, Redis, MongoDB, and the application in containers.
 
 ```bash
-# Clone and enter the project
+# 1. Clone and enter the project
+git clone <repo-url>
 cd agent-job-interviwer
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
+# 2. Create your .env file from the example
+cp .env.example .env
+# Edit .env with your credentials (GROQ_API_KEY, JWT_SECRET, etc.)
 
-# Install dependencies
-python3 -m pip install -r requirements.txt
+# 3. Build and start all services
+docker compose up --build
 
-# Configure .env (edit with your credentials)
-# Ensure MONGODB_URI, REDIS_URL, and JWT_SECRET are set
+# 4. Access the application
+# Interview dashboard: http://localhost:8000/interview/<candidate_id>
+# Admin dashboard:      http://localhost:8000/admin/dashboard
 ```
 
-### Run with Uvicorn
+#### Useful Docker commands
 
 ```bash
+# Run in background (detached mode)
+docker compose up --build -d
+
+# View logs
+docker compose logs -f app
+
+# Stop all services
+docker compose down
+
+# Stop and remove volumes (reset data)
+docker compose down -v
+```
+
+---
+
+### Option 2: Run Locally (Manual Setup)
+
+#### Install Python dependencies
+
+```bash
+# 1. Clone and enter the project
+git clone <repo-url>
+cd agent-job-interviwer
+
+# 2. Create and activate a virtual environment
+python3 -m venv .venv
+source .venv/bin/activate        # macOS / Linux
+# .venv\Scripts\activate         # Windows
+
+# 3. Install all dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+#### Start infrastructure services
+
+You still need MongoDB, Redis, and PostgreSQL running. Use Docker for just these:
+
+```bash
+# Start only the infrastructure containers (no app)
+docker compose up -d postgres redis mongodb
+```
+
+Or install them natively on your machine.
+
+#### Run the application
+
+```bash
+# With auto-reload (development)
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --reload
+
+# Without auto-reload (production-like)
+uvicorn src.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Run with Python directly
-
-```bash
-python3 -m uvicorn src.main:app --host 0.0.0.0 --port 8000
-```
+---
 
 ### Open the dashboard
 
@@ -274,14 +351,17 @@ Allow camera and microphone access when prompted.
 
 Navigate to `http://localhost:8000/admin/dashboard` in a separate window to view active interviews and real-time computer vision metrics.
 
+---
+
 ### Run tests
 
 ```bash
+# Activate the virtual environment first
+source .venv/bin/activate
+
+# Run all tests
 pytest tests/ -v
-```
 
-With coverage:
-
-```bash
+# Run with coverage report
 pytest tests/ --cov=src --cov-report=term-missing
 ```

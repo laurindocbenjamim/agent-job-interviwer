@@ -2,13 +2,13 @@ import numpy as np
 import pytest
 import math
 from unittest.mock import MagicMock, patch
-from src.domains.interviews.video_analyzer import analyze_frame
+from src.domains.interviews.analysis.video import analyze_frame
 
 def test_analyze_frame_dark_room():
     """Test that a dark frame results in a 'Poor Lighting' quality status."""
     frame = np.zeros((480, 640, 3), dtype=np.uint8)
     
-    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+    with patch("src.domains.interviews.analysis.video.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
@@ -22,7 +22,7 @@ def test_analyze_frame_bright_room_no_face():
     """Test that a bright frame with no face returns Good quality but no face."""
     frame = np.ones((480, 640, 3), dtype=np.uint8) * 255
     
-    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+    with patch("src.domains.interviews.analysis.video.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = []
         
@@ -46,7 +46,7 @@ def test_analyze_frame_focused_gaze():
     # Focused matrix: identity matrix (yaw=0, pitch=0)
     mock_matrix = np.eye(4)
     
-    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+    with patch("src.domains.interviews.analysis.video.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
         mock_detect.return_value.facial_transformation_matrixes = [mock_matrix]
@@ -78,7 +78,7 @@ def test_analyze_frame_looking_away_gaze():
     mock_matrix[2, 0] = -math.sin(theta)
     mock_matrix[2, 2] = math.cos(theta)
     
-    with patch("src.domains.interviews.video_analyzer.get_landmarker") as mock_get_landmarker:
+    with patch("src.domains.interviews.analysis.video.get_landmarker") as mock_get_landmarker:
         mock_detect = mock_get_landmarker.return_value.detect
         mock_detect.return_value.face_landmarks = [mock_landmarks]
         mock_detect.return_value.facial_transformation_matrixes = [mock_matrix]

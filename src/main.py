@@ -12,13 +12,22 @@ async def lifespan(app: FastAPI):
     """
     # 1. Initialize Sentry tracking from day one
     init_sentry()
-    # Initialize Postgres tables
-    from src.shared.postgres_db import init_postgres_db
-    await init_postgres_db()
+    # Initialize Postgres tables (non-blocking if DB is unreachable)
+    try:
+        from src.shared.postgres_db import init_postgres_db
+        await init_postgres_db()
+    except Exception as e:
+        print(f"[WARN] Postgres init failed (will retry on first query): {e}")
     yield
     # 2. Cleanup database clients to prevent connection leaks
-    await redis_client.close()
-    mongo_client.close()
+    try:
+        await redis_client.close()
+    except Exception:
+        pass
+    try:
+        mongo_client.close()
+    except Exception:
+        pass
 
 from fastapi.middleware.cors import CORSMiddleware
 

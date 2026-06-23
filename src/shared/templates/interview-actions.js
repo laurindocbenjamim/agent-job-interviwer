@@ -209,8 +209,6 @@ function startInterview() {
 
     updateAttemptDisplay();
     showPhase('interview');
-    connectWebSocket();
-    startFrameStreaming();
     
     // Start brightness check loop during interview
     State.brightnessInterval = setInterval(checkBrightness, 2000);

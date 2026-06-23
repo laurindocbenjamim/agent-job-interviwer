@@ -1,89 +1,60 @@
-import asyncio
-import base64
 import json
-import cv2
-import numpy as np
 from pathlib import Path
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader
-
-from src.domains.interviews.video_analyzer import analyze_frame
-from src.domains.interviews.service import evaluate_candidate_frame
-from src.domains.interviews.schemas import ViolationsReport, ViolationEvent
-from src.shared.database import log_activity, get_violation_events
+from aiortc import RTCPeerConnection, RTCSessionDescription
+from src.domains.interviews.schemas import OfferRequest, SubmitRequest, DeviceTelemetry
+from src.domains.interviews.state import active_sessions, peer_connections
+from src.domains.interviews.websocket import interview_stream
+from src.domains.interviews.rtc.webrtc import InterviewVideoStreamTrack, InterviewAudioStreamTrack, TTSAudioStreamTrack
+from src.domains.interviews.ai.agent import generate_agent_response
+from src.domains.interviews.ai.compliance_agent import ComplianceAnalystAgent
+from src.domains.interviews.ai.tts import generate_speech
+from src.shared.database import log_activity, get_violation_events, save_interview_session, get_interview_session
+from src.shared.redis_client import redis_client
 from src.config.settings import settings
 
 router = APIRouter()
 
-active_sessions = {}
-
 TEMPLATE_DIR = Path(__file__).resolve().parents[2] / "shared" / "templates"
 jinja_env = Environment(loader=FileSystemLoader(str(TEMPLATE_DIR)))
 
+
 @router.get("/interview/{candidate_id}", response_class=HTMLResponse)
 async def serve_interview_console(candidate_id: str):
-    """Serves the dashboard HTML page with injected configuration."""
     from src.shared.postgres_db import get_postgres_config
     config = await get_postgres_config(candidate_id)
     if config:
-        duration_mins = config.interview_duration_minutes
-        gender = config.avatar_gender.lower()
-        time_limit = config.question_time_limit_seconds
-        is_active = config.is_active
-        speech_lang = config.speech_language
-        text_lang = config.text_language
-    else:
-        # User requested: "if not found, display the message 'Interview not Available'"
-        html_content = """
-        <!DOCTYPE html>
-        <html lang="en" data-theme="dark">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Interview Not Available</title>
-            <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
-            <style>
-                body { font-family: 'Outfit', sans-serif; background-color: #000; color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                .card { background: rgba(255, 255, 255, 0.05); padding: 3rem; border-radius: 1rem; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; }
-                .icon { font-size: 4rem; margin-bottom: 1rem; display: block; }
-                h1 { margin: 0 0 0.5rem 0; font-size: 2rem; color: #ef4444; }
-                p { margin: 0; color: #94a3b8; }
-            </style>
-        </head>
-        <body>
-            <div class="card">
-                <span class="icon">🚫</span>
-                <h1>Interview Not Available</h1>
-                <p>The requested interview session could not be found or has expired.</p>
-            </div>
-        </body>
-        </html>
-        """
-        return HTMLResponse(content=html_content, status_code=404)
+        rendered = jinja_env.get_template("interview.html").render(
+            interview_duration_minutes=config.interview_duration_minutes,
+            total_user_attempt=settings.total_user_attempt,
+            avatar_gender=config.avatar_gender.lower(),
+            agent_speech_speed=settings.agent_speech_speed,
+            question_time_limit_seconds=config.question_time_limit_seconds,
+            is_active=config.is_active,
+            speech_language=config.speech_language,
+            text_language=config.text_language
+        )
+        return HTMLResponse(content=rendered)
+    html_content = """<!DOCTYPE html><html lang="en" data-theme="dark">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Interview Not Available</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>body{font-family:'Outfit',sans-serif;background:#000;color:#fff;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+.card{background:rgba(255,255,255,.05);padding:3rem;border-radius:1rem;border:1px solid rgba(255,255,255,.1);text-align:center}
+.icon{font-size:4rem;margin-bottom:1rem;display:block}
+h1{margin:0 0 .5rem 0;font-size:2rem;color:#ef4444}
+p{margin:0;color:#94a3b8}</style></head>
+<body><div class="card"><span class="icon">🚫</span><h1>Interview Not Available</h1>
+<p>The requested interview session could not be found or has expired.</p></div></body></html>"""
+    return HTMLResponse(content=html_content, status_code=404)
 
-    try:
-        template = jinja_env.get_template("interview.html")
-    except Exception:
-        raise HTTPException(status_code=404, detail="Template file not found")
-
-    rendered = template.render(
-        interview_duration_minutes=duration_mins,
-        total_user_attempt=settings.total_user_attempt,
-        avatar_gender=gender,
-        agent_speech_speed=settings.agent_speech_speed,
-        question_time_limit_seconds=time_limit,
-        is_active=is_active,
-        speech_language=speech_lang,
-        text_language=text_lang
-    )
-    return HTMLResponse(content=rendered)
 
 @router.get("/interview/{candidate_id}/violations")
 async def get_violations_report(candidate_id: str):
-    """Returns aggregated violations for a candidate after the interview."""
+    from src.domains.interviews.schemas import ViolationEvent, ViolationsReport
     raw_events = await get_violation_events(candidate_id)
-
     events = [
         ViolationEvent(
             timestamp=e["timestamp"].isoformat() if hasattr(e["timestamp"], "isoformat") else str(e["timestamp"]),
@@ -93,7 +64,6 @@ async def get_violations_report(candidate_id: str):
         )
         for e in raw_events
     ]
-
     report = ViolationsReport(
         candidate_id=candidate_id,
         total_violations=len(events),
@@ -101,22 +71,17 @@ async def get_violations_report(candidate_id: str):
         events=events,
     )
     result = report.model_dump()
-    
-    from src.shared.redis_client import redis_client
     try:
         start_val = await redis_client.get(f"cv_threshold:start_time:{candidate_id}")
         result["start_time"] = start_val.decode() if isinstance(start_val, bytes) else start_val
     except Exception:
         result["start_time"] = None
-
     try:
         end_val = await redis_client.get(f"cv_threshold:end_time:{candidate_id}")
         result["end_time"] = end_val.decode() if isinstance(end_val, bytes) else end_val
     except Exception:
         result["end_time"] = None
-    
-    from src.domains.interviews.agent import _sessions
-    from src.shared.database import get_interview_session
+    from src.domains.interviews.ai.agent import _sessions
     try:
         transcript = _sessions.get(candidate_id, [])
         if not transcript:
@@ -124,158 +89,21 @@ async def get_violations_report(candidate_id: str):
     except Exception:
         transcript = []
     result["transcript"] = transcript
-    
-    from src.domains.interviews.agent import generate_compliance_analysis
-    result["compliance_analysis"] = await generate_compliance_analysis(candidate_id, result)
+    result["compliance_analysis"] = await ComplianceAnalystAgent().analyze(candidate_id, result)
     return result
 
+
 @router.websocket("/ws/interview/{candidate_id}")
-async def interview_stream(websocket: WebSocket, candidate_id: str):
-    """WebSocket stream for camera frames and compliance verification."""
-    await websocket.accept()
-    active_sessions[candidate_id] = {}
+async def ws_interview_stream(websocket: WebSocket, candidate_id: str):
+    await interview_stream(websocket, candidate_id)
 
-    # Record interview start time in Redis
-    from src.shared.redis_client import redis_client
-    import datetime
-    now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    await redis_client.set(f"cv_threshold:start_time:{candidate_id}", now_str, ex=7200)
-
-    try:
-        while True:
-            try:
-                data = await websocket.receive_text()
-                payload = json.loads(data)
-
-                # Handle live transcript
-                from src.domains.admin.router import admin_connections
-                if payload.get("action") == "live_transcript":
-                    transcript_payload = {
-                        "action": "live_transcript",
-                        "text": payload.get("text", ""),
-                        "is_final": payload.get("is_final", False)
-                    }
-                    disconnected_admins = []
-                    for admin_ws in admin_connections.get(candidate_id, []):
-                        try:
-                            await admin_ws.send_json(transcript_payload)
-                        except Exception:
-                            disconnected_admins.append(admin_ws)
-                    for disconnected in disconnected_admins:
-                        admin_connections[candidate_id].remove(disconnected)
-                    continue
-
-                if "image" not in payload:
-                    continue
-
-                try:
-                    base64_data = payload["image"].split(",")[1]
-                    image_bytes = base64.b64decode(base64_data)
-                    np_array = np.frombuffer(image_bytes, dtype=np.uint8)
-                    frame = cv2.imdecode(np_array, cv2.IMREAD_COLOR)
-                except Exception as e:
-                    print(f"[WS DEBUG] Base64 decode failed for {candidate_id}: {e}")
-                    continue
-
-                if frame is None:
-                    continue
-
-                audio_level = payload.get("audio_level", 0.0)
-
-                from src.shared.redis_client import redis_client
-                yaw_val = await redis_client.get(f"cv_threshold:yaw:{candidate_id}")
-                pitch_val = await redis_client.get(f"cv_threshold:pitch:{candidate_id}")
-                bright_val = await redis_client.get(f"cv_threshold:brightness:{candidate_id}")
-                gaze_min_val = await redis_client.get(f"cv_threshold:gaze_min:{candidate_id}")
-                gaze_max_val = await redis_client.get(f"cv_threshold:gaze_max:{candidate_id}")
-                mic_gain_val = await redis_client.get(f"cv_threshold:mic_gain:{candidate_id}")
-                noise_thresh_val = await redis_client.get(f"cv_threshold:noise_thresh:{candidate_id}")
-
-                yaw_thresh = float(yaw_val) if yaw_val is not None else 20.0
-                pitch_thresh = float(pitch_val) if pitch_val is not None else 20.0
-                brightness_thresh = float(bright_val) if bright_val is not None else 90.0
-                gaze_min = float(gaze_min_val) if gaze_min_val is not None else 0.025
-                gaze_max = float(gaze_max_val) if gaze_max_val is not None else 0.055
-                mic_gain = float(mic_gain_val) if mic_gain_val is not None else 1.0
-                noise_thresh = float(noise_thresh_val) if noise_thresh_val is not None else 2.0
-
-                is_violation, details, video_quality, annotated_frame = await asyncio.to_thread(
-                    analyze_frame, frame, True, yaw_thresh, pitch_thresh, brightness_thresh, gaze_min, gaze_max
-                )
-
-                response_data = await evaluate_candidate_frame(
-                    candidate_id=candidate_id,
-                    is_violation=is_violation,
-                    details=details,
-                    video_quality=video_quality,
-                )
-                
-                # Append audio configuration to sync back to candidate JS
-                response_data["mic_gain"] = mic_gain
-                response_data["noise_thresh"] = noise_thresh
-
-                # Broadcast to admins if any are connected
-                from src.domains.admin.router import admin_connections
-                if candidate_id in admin_connections and admin_connections[candidate_id]:
-                    _, buffer = cv2.imencode('.jpg', annotated_frame)
-                    b64_image = base64.b64encode(buffer).decode('utf-8')
-                    admin_payload = {
-                        "image": f"data:image/jpeg;base64,{b64_image}",
-                        "details": details,
-                        "video_quality": video_quality,
-                        "is_violation": is_violation,
-                        "current_strikes": response_data.get("current_strikes", 0),
-                        "audio_level": audio_level
-                    }
-                    disconnected_admins = []
-                    for admin_ws in admin_connections[candidate_id]:
-                        try:
-                            await admin_ws.send_json(admin_payload)
-                        except Exception:
-                            disconnected_admins.append(admin_ws)
-                    for admin_ws in disconnected_admins:
-                        admin_connections[candidate_id].remove(admin_ws)
-
-                await websocket.send_json(response_data)
-            except WebSocketDisconnect:
-                break
-            except RuntimeError as re:
-                if "disconnect" in str(re).lower() or "receive" in str(re).lower():
-                    break
-                print(f"[WS DEBUG] Inner loop error for {candidate_id}: {re}")
-            except Exception as inner_e:
-                print(f"[WS DEBUG] Inner loop error for {candidate_id}: {inner_e}")
-
-    except WebSocketDisconnect:
-        await log_activity(candidate_id, "session_disconnected", {"status": "closed"})
-    except Exception as outer_e:
-        print(f"[WS DEBUG] Outer loop error for {candidate_id}: {outer_e}")
-    finally:
-        import datetime
-        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        from src.shared.redis_client import redis_client
-        await redis_client.set(f"cv_threshold:end_time:{candidate_id}", now_str, ex=7200)
-        active_sessions.pop(candidate_id, None)
-
-from pydantic import BaseModel
-from aiortc import RTCPeerConnection, RTCSessionDescription
-from src.domains.interviews.webrtc import InterviewVideoStreamTrack, InterviewAudioStreamTrack, TTSAudioStreamTrack
-
-# Store peer connections to prevent garbage collection and allow cleanup
-peer_connections = set()
-
-class OfferRequest(BaseModel):
-    sdp: str
-    type: str
 
 @router.post("/interview/{candidate_id}/offer")
 async def offer(candidate_id: str, offer_request: OfferRequest):
-    """WebRTC signaling endpoint. Accepts an SDP offer and returns an answer."""
     offer = RTCSessionDescription(sdp=offer_request.sdp, type=offer_request.type)
     pc = RTCPeerConnection()
     peer_connections.add(pc)
-    
-    # Setup TTS Audio Track to send to the candidate
+
     tts_track = TTSAudioStreamTrack()
     pc.addTrack(tts_track)
 
@@ -289,7 +117,7 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
     @pc.on("connectionstatechange")
     async def on_connectionstatechange():
         print(f"Connection state is {pc.connectionState}")
-        if pc.connectionState == "failed" or pc.connectionState == "closed":
+        if pc.connectionState in ("failed", "closed"):
             await pc.close()
             peer_connections.discard(pc)
             active_sessions.pop(candidate_id, None)
@@ -298,24 +126,18 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
     @pc.on("track")
     def on_track(track):
         if track.kind == "video":
-            # Wrap the incoming video track with our custom tracker
             local_video = InterviewVideoStreamTrack(track, candidate_id)
-            # Find an existing video transceiver with no sender track to reuse
             video_transceiver = next((t for t in pc.getTransceivers() if t.kind == "video" and t.sender.track is None), None)
             if video_transceiver:
                 video_transceiver.sender.replaceTrack(local_video)
                 video_transceiver.direction = "sendrecv"
             else:
                 pc.addTrack(local_video)
-            
             @track.on("ended")
             async def on_ended():
                 await log_activity(candidate_id, "video_track_ended", {})
-                
         elif track.kind == "audio":
-            # Wrap the incoming audio track
             local_audio = InterviewAudioStreamTrack(track, candidate_id, tts_track, channel_ref)
-            # Find an existing audio transceiver with no sender track to reuse
             audio_transceiver = next((t for t in pc.getTransceivers() if t.kind == "audio" and t.sender.track is None), None)
             if audio_transceiver:
                 audio_transceiver.sender.replaceTrack(local_audio)
@@ -323,44 +145,64 @@ async def offer(candidate_id: str, offer_request: OfferRequest):
             else:
                 pc.addTrack(local_audio)
 
-    # Handle offer and create answer
     await pc.setRemoteDescription(offer)
     answer = await pc.createAnswer()
     await pc.setLocalDescription(answer)
-
     return {"sdp": pc.localDescription.sdp, "type": pc.localDescription.type}
 
-from src.domains.interviews.agent import _sessions, generate_agent_response
-from src.shared.database import save_interview_session
-from src.domains.interviews.tts import generate_speech
-import json
 
-class SubmitRequest(BaseModel):
-    answer: str = ""
+@router.post("/interview/{candidate_id}/start")
+async def start_interview(candidate_id: str):
+    import datetime
+    from src.domains.interviews.rtc.webrtc import InterviewAudioStreamTrack
+    
+    session = active_sessions.get(candidate_id)
+    if not session:
+        return {"status": "error", "message": "Session not found"}
+        
+    # Find the audio track and enable interview mode
+    pc = next((p for p in peer_connections if getattr(p, "candidate_id", None) == candidate_id), None)
+    # The transceiver holds the sender with the track, but since we have a reference to active_sessions it might not have the track directly.
+    # Wait, pc.getTransceivers() doesn't expose candidate_id. We can search pc's receivers.
+    # A more robust way is to just set it on all InterviewAudioStreamTrack for this candidate.
+    import gc
+    for obj in gc.get_objects():
+        if isinstance(obj, InterviewAudioStreamTrack) and obj.candidate_id == candidate_id:
+            obj.is_interview_started = True
+
+    start_time = datetime.datetime.utcnow().isoformat()
+    await redis_client.set(f"cv_threshold:start_time:{candidate_id}", start_time)
+    
+    from src.domains.admin.state import admin_connections
+    import json
+    if candidate_id in admin_connections:
+        payload = json.dumps({"start_time": start_time})
+        for admin_ws in admin_connections[candidate_id]:
+            try:
+                import asyncio
+                asyncio.create_task(admin_ws.send_text(payload))
+            except Exception:
+                pass
+                
+    return {"status": "success", "start_time": start_time}
+
 
 @router.post("/interview/{candidate_id}/submit")
 async def force_submit_answer(candidate_id: str, request: SubmitRequest):
-    """Forces the LLM to generate the next question based on current history and user's answer."""
+    from src.domains.admin.state import admin_connections
     response = await generate_agent_response(candidate_id, request.answer)
-    
     session = active_sessions.get(candidate_id)
     if session:
-        # Send JSON via DataChannel
         channel = session["channel_ref"].get("channel")
         if channel and channel.readyState == "open":
             try:
                 channel.send(json.dumps(response))
             except Exception as e:
                 print(f"Error sending datachannel message: {e}")
-                
-        # Send Audio via TTS track
-        if text_to_speak:
-            pcm_bytes = await generate_speech(text_to_speak)
-            await session["tts_track"].add_audio(pcm_bytes)
-            
     text_to_speak = response.get("text_to_speak", "")
     if text_to_speak:
-        from src.domains.admin.router import admin_connections
+        pcm_bytes = await generate_speech(text_to_speak)
+        await session["tts_track"].add_audio(pcm_bytes)
         if candidate_id in admin_connections:
             payload = json.dumps({"agent_text": text_to_speak})
             for admin_ws in admin_connections[candidate_id]:
@@ -368,43 +210,56 @@ async def force_submit_answer(candidate_id: str, request: SubmitRequest):
                     await admin_ws.send_text(payload)
                 except Exception:
                     pass
-            
     return response
+
 
 @router.post("/interview/{candidate_id}/finalize")
 async def finalize_interview(candidate_id: str):
-    """Ends the interview and saves the final transcript."""
-    from src.shared.database import save_interview_session
+    import datetime
+    
+    end_time = datetime.datetime.utcnow().isoformat()
+    await redis_client.set(f"cv_threshold:end_time:{candidate_id}", end_time)
+    
+    from src.domains.admin.state import admin_connections
+    import json
+    if candidate_id in admin_connections:
+        payload = json.dumps({"end_time": end_time})
+        for admin_ws in admin_connections[candidate_id]:
+            try:
+                import asyncio
+                asyncio.create_task(admin_ws.send_text(payload))
+            except Exception:
+                pass
     
     session = active_sessions.pop(candidate_id, None)
     if not session:
         return {"status": "error", "message": "Session not found"}
         
+    # Stop TTS processing
+    if "tts_track" in session:
+        session["tts_track"].clear_queue()
+        
+    # Stop the agent transcript generation 
+    import gc
+    from src.domains.interviews.rtc.webrtc import InterviewAudioStreamTrack
+    for obj in gc.get_objects():
+        if isinstance(obj, InterviewAudioStreamTrack) and obj.candidate_id == candidate_id:
+            obj.is_interview_started = False
+            
     transcript = session.get("transcript", [])
     await save_interview_session(candidate_id, transcript)
-    
-    return {"status": "success", "message": "Interview finalized"}
+    return {"status": "success", "message": "Interview finalized", "end_time": end_time}
 
-from pydantic import BaseModel
-
-class DeviceTelemetry(BaseModel):
-    device: str
-    location: str
 
 @router.post("/interview/{candidate_id}/telemetry/device")
 async def receive_device_telemetry(candidate_id: str, payload: DeviceTelemetry):
-    """Receives device and location telemetry from the candidate's browser and pushes to admin feed."""
-    from src.shared.redis_client import redis_client
-    import json
+    from src.domains.admin.state import admin_connections
     data = {"action": "telemetry", "device": payload.device, "location": payload.location}
     await redis_client.set(f"telemetry:device:{candidate_id}", json.dumps(data), ex=7200)
-    
-    from src.domains.admin.router import admin_connections
     if candidate_id in admin_connections:
-        payload = json.dumps(data)
         for admin_ws in admin_connections[candidate_id]:
             try:
-                await admin_ws.send_text(payload)
+                await admin_ws.send_text(json.dumps(data))
             except Exception:
                 pass
     return {"status": "success"}

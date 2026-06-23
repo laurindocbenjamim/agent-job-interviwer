@@ -22,7 +22,7 @@ services:
     image: redis:7-alpine
     container_name: interview_redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     volumes:
       - redis_data:/data
 
@@ -30,7 +30,7 @@ services:
     image: mongo:6-jammy
     container_name: interview_mongodb
     ports:
-      - "27017:27017"
+      - "27018:27017"
     volumes:
       - mongodb_data:/data/db
 
@@ -41,6 +41,10 @@ services:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - POSTGRES_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/interview_db
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       postgres:
         condition: service_healthy

@@ -52,6 +52,10 @@ class UpstashRedisClient:
     async def delete(self, key: str) -> Any:
         return await self._execute(["DEL", key])
 
+    async def close(self) -> None:
+        """No-op for Upstash HTTP client — each request creates its own httpx client."""
+        pass
+
 # Global async redis client wrapper
 redis_client = UpstashRedisClient(
     url=settings.upstash_redis_rest_url,

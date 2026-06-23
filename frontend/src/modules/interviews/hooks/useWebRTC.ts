@@ -11,6 +11,8 @@ export function useWebRTC(candidateId: string) {
   const [status, setStatus] = useState<string>('idle');
   const [agentMessage, setAgentMessage] = useState<any>(null);
   const [isAudioEnabled, setIsAudioEnabled] = useState(true);
+  const [startTime, setStartTime] = useState<string | null>(null);
+  const [endTime, setEndTime] = useState<string | null>(null);
 
   // Initialize hidden audio element for remote AI voice
   useEffect(() => {
@@ -26,7 +28,7 @@ export function useWebRTC(candidateId: string) {
     }
   };
 
-  const startInterview = async () => {
+  const connectEarly = async () => {
     try {
       setStatus('connecting');
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -81,11 +83,33 @@ export function useWebRTC(candidateId: string) {
       const answer = await response.json();
       await pc.setRemoteDescription(answer);
 
-      setIsStarted(true);
       setStatus('connected');
     } catch (err) {
       console.error('Failed to start WebRTC', err);
       setStatus('error');
+    }
+  };
+
+  useEffect(() => {
+    connectEarly();
+    return () => {
+      stopInterview();
+    };
+  }, [candidateId]);
+
+  const startInterview = async () => {
+    try {
+      const res = await fetch(`http://localhost:8000/interview/${candidateId}/start`, {
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (data.start_time) {
+        setStartTime(data.start_time);
+      }
+      setIsStarted(true);
+      setStatus('active');
+    } catch (err) {
+      console.error('Failed to start interview', err);
     }
   };
 
@@ -118,9 +142,13 @@ export function useWebRTC(candidateId: string) {
 
   const finalizeSession = async () => {
     try {
-      await fetch(`http://localhost:8000/interview/${candidateId}/finalize`, {
+      const res = await fetch(`http://localhost:8000/interview/${candidateId}/finalize`, {
         method: 'POST'
       });
+      const data = await res.json();
+      if (data.end_time) {
+        setEndTime(data.end_time);
+      }
       stopInterview();
       setStatus('completed');
     } catch (err) {
@@ -128,11 +156,7 @@ export function useWebRTC(candidateId: string) {
     }
   };
 
-  useEffect(() => {
-    return () => {
-      stopInterview();
-    };
-  }, []);
+
 
   return { 
     localVideoRef, 
@@ -140,6 +164,8 @@ export function useWebRTC(candidateId: string) {
     status, 
     agentMessage,
     isAudioEnabled,
+    startTime,
+    endTime,
     startInterview, 
     stopInterview,
     toggleAudio,

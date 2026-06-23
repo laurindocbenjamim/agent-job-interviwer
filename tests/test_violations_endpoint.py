@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 from src.main import app
 
@@ -7,11 +7,20 @@ client = TestClient(app)
 
 def test_interview_html_renders_with_config():
     """Test that the dashboard renders with injected interview config."""
-    response = client.get("/interview/candidate_test")
-    assert response.status_code == 200
-    assert "Interview AI" in response.text
-    assert "Start Interview" in response.text
-    assert "PREVIEW" in response.text
+    mock_config = MagicMock()
+    mock_config.interview_duration_minutes = 30
+    mock_config.avatar_gender = "female"
+    mock_config.question_time_limit_seconds = 60
+    mock_config.is_active = True
+    mock_config.speech_language = "en-US"
+    mock_config.text_language = "en"
+
+    with patch("src.shared.postgres_db.get_postgres_config", new_callable=AsyncMock, return_value=mock_config):
+        response = client.get("/interview/candidate_test")
+        assert response.status_code == 200
+        assert "Interview AI" in response.text
+        assert "Start Interview" in response.text
+        assert "PREVIEW" in response.text
 
 @patch("src.domains.interviews.router.get_violation_events", new_callable=AsyncMock)
 def test_violations_endpoint_with_events(mock_get_events):

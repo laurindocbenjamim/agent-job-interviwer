@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     libgl1 \
     libglib2.0-0 \
+    libgles2 \
+    libegl1 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -13,8 +15,9 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code and other files
+# Copy source code and config files
 COPY src/ ./src/
+COPY .env* ./
 
 # Expose port 8000
 EXPOSE 8000

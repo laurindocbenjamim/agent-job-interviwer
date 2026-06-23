@@ -111,6 +111,11 @@ async function initCamera(deviceId = null) {
         // Populate dropdown on first load after permissions are granted
         if (!deviceId) getConnectedDevices();
         
+        if (!State.ws || State.ws.readyState !== WebSocket.OPEN) {
+            connectWebSocket();
+            startFrameStreaming();
+        }
+        
     } catch (err) {
         console.error('[Camera/Mic] Failed to access devices:', err);
         updateEnvCheck('camera', false);
@@ -314,7 +319,8 @@ function startFrameStreaming() {
         if (State.ws?.readyState === WebSocket.OPEN && State.localStream) {
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const dataUrl = canvas.toDataURL('image/jpeg', 0.4);
-            State.ws.send(JSON.stringify({ image: dataUrl, audio_level: State.currentAudioLevel }));
+            const isStarted = State.currentPhase === 'interview';
+            State.ws.send(JSON.stringify({ image: dataUrl, audio_level: State.currentAudioLevel, is_started: isStarted }));
         }
     }, 400);
 }

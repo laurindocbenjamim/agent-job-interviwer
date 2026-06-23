@@ -15,7 +15,9 @@ export const InterviewPage: React.FC = () => {
     localVideoRef, 
     isStarted, 
     status, 
-    agentMessage,
+    isAudioEnabled,
+    startTime,
+    endTime,
     startInterview, 
     submitAnswer,
     finalizeSession
@@ -64,7 +66,9 @@ export const InterviewPage: React.FC = () => {
     <div className="interview-container">
       <header className="interview-header">
         <h1 className="title-gradient">Interview AI</h1>
-        <div className="status-badges flex gap-4">
+        <div className="status-badges flex gap-4 items-center">
+          {startTime && <span className="text-sm text-slate-400">Started: {new Date(startTime).toLocaleTimeString()}</span>}
+          {endTime && <span className="text-sm text-slate-400">Ended: {new Date(endTime).toLocaleTimeString()}</span>}
           <span className={`status-badge ${status}`}>
             {status.toUpperCase()}
           </span>

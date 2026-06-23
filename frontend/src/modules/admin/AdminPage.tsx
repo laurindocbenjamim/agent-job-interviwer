@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import './AdminVoicePage.css';
+import './AdminPage.css';
 
-export const AdminVoicePage: React.FC = () => {
+export const AdminPage: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [status, setStatus] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);

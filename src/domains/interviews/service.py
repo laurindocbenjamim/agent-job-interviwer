@@ -6,7 +6,8 @@ async def evaluate_candidate_frame(
     candidate_id: str,
     is_violation: bool,
     details: Dict[str, Any],
-    video_quality: str
+    video_quality: str,
+    is_started: bool = True
 ) -> Dict[str, Any]:
     """
     Evaluates candidate metrics, increments strikes if needed,
@@ -28,7 +29,7 @@ async def evaluate_candidate_frame(
     }
 
     # 3. Handle violation rules engine
-    if is_violation:
+    if is_violation and is_started:
         current_strikes = await increment_candidate_strikes(candidate_id)
         response_data["current_strikes"] = current_strikes
         

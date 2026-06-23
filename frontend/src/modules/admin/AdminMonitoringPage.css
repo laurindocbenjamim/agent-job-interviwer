@@ -1,0 +1,130 @@
+.admin-monitoring-container {
+  min-height: 100vh;
+  background-color: #050505;
+  color: #fff;
+  padding: 2rem;
+  font-family: 'Outfit', sans-serif;
+}
+
+.monitoring-header {
+  margin-bottom: 2rem;
+}
+
+.monitoring-header h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+
+.session-id {
+  color: #3b82f6;
+}
+
+.session-times {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.time-badge {
+  font-size: 0.85rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: #cbd5e1;
+}
+
+.monitoring-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1000px;
+}
+
+.video-feed-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 1rem;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.video-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #94a3b8;
+}
+
+.radar-icon {
+  color: #475569;
+  animation: pulse 2s infinite ease-in-out;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 1; }
+  100% { transform: scale(1); opacity: 0.5; }
+}
+
+.candidate-video-stream {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.audio-wavelength-card, .actions-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #94a3b8;
+  margin-bottom: 1rem;
+}
+
+.audio-visualizer {
+  height: 30px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.audio-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #10b981);
+  transition: width 0.1s ease, opacity 0.1s ease;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.5rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-primary:hover {
+  background: #2563eb;
+}
+
+.w-full {
+  width: 100%;
+}

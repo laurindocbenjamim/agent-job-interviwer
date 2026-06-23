@@ -14,7 +14,8 @@ from src.shared.database import log_activity
 
 async def interview_stream(websocket: WebSocket, candidate_id: str):
     await websocket.accept()
-    active_sessions[candidate_id] = {}
+    if candidate_id not in active_sessions:
+        active_sessions[candidate_id] = {}
 
     now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     await redis_client.set(f"cv_threshold:start_time:{candidate_id}", now_str, ex=7200)
@@ -129,4 +130,3 @@ async def interview_stream(websocket: WebSocket, candidate_id: str):
     finally:
         now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         await redis_client.set(f"cv_threshold:end_time:{candidate_id}", now_str, ex=7200)
-        active_sessions.pop(candidate_id, None)

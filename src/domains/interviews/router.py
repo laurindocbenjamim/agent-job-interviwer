@@ -201,8 +201,9 @@ async def force_submit_answer(candidate_id: str, request: SubmitRequest):
                 print(f"Error sending datachannel message: {e}")
     text_to_speak = response.get("text_to_speak", "")
     if text_to_speak:
-        pcm_bytes = await generate_speech(text_to_speak)
-        await session["tts_track"].add_audio(pcm_bytes)
+        if session and "tts_track" in session:
+            pcm_bytes = await generate_speech(text_to_speak)
+            await session["tts_track"].add_audio(pcm_bytes)
         if candidate_id in admin_connections:
             payload = json.dumps({"agent_text": text_to_speak})
             for admin_ws in admin_connections[candidate_id]:

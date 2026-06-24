@@ -1,40 +1,6 @@
-<!DOCTYPE html>
-<html lang="en" data-theme="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard - Real-time CV Monitoring</title>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --bg-gradient: #000000;
-            --glass-bg: rgba(20, 20, 20, 0.6);
-            --glass-border: rgba(255, 255, 255, 0.08);
-            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            
-            --text-primary: #f8fafc;
-            --text-secondary: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-green: #10b981;
-            --accent-red: #ef4444;
-            --accent-orange: #f59e0b;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Outfit', sans-serif;
-            background: var(--bg-gradient);
-            color: var(--text-primary);
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-
+{% extends "admin_layout.html" %}
+{% block extra_css %}
+<style>
         /* Glassmorphic Sidebar */
         .sidebar {
             width: 280px;
@@ -48,11 +14,9 @@
             position: relative;
             z-index: 10;
         }
-
         .sidebar.collapsed {
             width: 80px;
         }
-
         .sidebar-header {
             height: 80px;
             padding: 0 1.5rem;
@@ -63,12 +27,10 @@
             overflow: hidden;
             white-space: nowrap;
         }
-
         .sidebar.collapsed .sidebar-header {
             padding: 0;
             justify-content: center;
         }
-
         .sidebar-title {
             display: flex;
             align-items: center;
@@ -77,12 +39,10 @@
             font-weight: 700;
             transition: opacity 0.3s;
         }
-
         .sidebar.collapsed .sidebar-title {
             opacity: 0;
             display: none;
         }
-
         .toggle-btn {
             background: rgba(255, 255, 255, 0.05);
             border: 1px solid var(--glass-border);
@@ -98,12 +58,10 @@
             transition: all 0.2s;
             flex-shrink: 0;
         }
-
         .toggle-btn:hover {
             background: rgba(255, 255, 255, 0.1);
             transform: scale(1.05);
         }
-
         .sessions-list {
             flex: 1;
             overflow-y: auto;
@@ -112,12 +70,10 @@
             flex-direction: column;
             gap: 0.75rem;
         }
-
         .sidebar.collapsed .sessions-list {
             padding: 1.5rem 0.5rem;
             align-items: center;
         }
-
         .session-item {
             padding: 1rem;
             border-radius: 12px;
@@ -131,7 +87,6 @@
             overflow: hidden;
             white-space: nowrap;
         }
-
         .sidebar.collapsed .session-item {
             padding: 0.75rem;
             justify-content: center;
@@ -139,27 +94,22 @@
             height: 50px;
             border-radius: 50%;
         }
-
         .session-item:hover {
             background: rgba(255, 255, 255, 0.08);
             transform: translateX(4px);
         }
-
         .sidebar.collapsed .session-item:hover {
             transform: scale(1.1);
         }
-
         .session-item.active {
             border-color: rgba(59, 130, 246, 0.5);
             background: linear-gradient(90deg, rgba(59, 130, 246, 0.15) 0%, transparent 100%);
             box-shadow: inset 4px 0 0 var(--accent-blue);
         }
-
         .sidebar.collapsed .session-item.active {
             box-shadow: inset 0 0 0 2px var(--accent-blue);
             background: rgba(59, 130, 246, 0.2);
         }
-
         .session-dot {
             width: 12px;
             height: 12px;
@@ -169,7 +119,6 @@
             flex-shrink: 0;
             position: relative;
         }
-
         /* Ping animation for live dot */
         .session-dot::after {
             content: '';
@@ -180,11 +129,9 @@
             animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
             opacity: 0.5;
         }
-
         @keyframes ping {
             75%, 100% { transform: scale(2); opacity: 0; }
         }
-
         .session-info {
             display: flex;
             flex-direction: column;
@@ -192,23 +139,18 @@
             opacity: 1;
             transition: opacity 0.3s;
         }
-
         .sidebar.collapsed .session-info {
             opacity: 0;
             display: none;
         }
-
         .sidebar.collapsed .sidebar-btn-text {
             display: none;
         }
-
         .sidebar.collapsed .sidebar-action {
             padding: 1rem 0.5rem !important;
         }
-
         .candidate-id { font-weight: 600; font-size: 0.95rem; }
         .session-status { font-size: 0.8rem; color: var(--text-secondary); margin-top: 0.2rem; }
-
         /* Main View */
         .main-content {
             flex: 1;
@@ -217,7 +159,6 @@
             position: relative;
             z-index: 1;
         }
-
         .topbar {
             height: 80px;
             background: rgba(15, 23, 42, 0.4);
@@ -231,7 +172,6 @@
             font-weight: 600;
             letter-spacing: 0.5px;
         }
-
         .content-area {
             flex: 1;
             display: grid;
@@ -240,17 +180,7 @@
             padding: 2.5rem;
             overflow-y: auto;
         }
-
         /* Glass Cards */
-        .glass-card {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-radius: 24px;
-            border: 1px solid var(--glass-border);
-            box-shadow: var(--glass-shadow);
-        }
-
         /* Video Feed */
         .video-container {
             overflow: hidden;
@@ -260,14 +190,12 @@
             position: relative;
             min-height: 500px;
         }
-
         .video-container img {
             width: 100%;
             height: 100%;
             object-fit: contain;
             border-radius: 24px;
         }
-
         .no-video-overlay {
             position: absolute;
             inset: 0;
@@ -280,25 +208,21 @@
             background: rgba(0, 0, 0, 0.2);
             border-radius: 24px;
         }
-
         .no-video-icon {
             font-size: 4rem;
             margin-bottom: 1.5rem;
             opacity: 0.5;
             filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5));
         }
-
         /* Metrics Sidebar */
         .metrics-sidebar {
             display: flex;
             flex-direction: column;
             gap: 2rem;
         }
-
         .metric-card {
             padding: 2rem;
         }
-
         .metric-title {
             font-size: 0.85rem;
             color: var(--text-secondary);
@@ -310,7 +234,6 @@
             align-items: center;
             gap: 0.5rem;
         }
-
         .metric-row {
             display: flex;
             justify-content: space-between;
@@ -319,24 +242,20 @@
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
             transition: background-color 0.2s;
         }
-
         .metric-row:last-child {
             border-bottom: none;
             padding-bottom: 0;
         }
-
         .metric-label {
             color: var(--text-secondary);
             font-weight: 500;
         }
-
         .metric-val {
             font-weight: 600;
             font-family: 'Outfit', sans-serif;
             font-size: 1.2rem;
-            color: #fff;
+            color: var(--text-primary);
         }
-
         .badge {
             padding: 0.4rem 1rem;
             border-radius: 999px;
@@ -345,11 +264,9 @@
             letter-spacing: 0.5px;
             box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-
         .badge.ok { background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3); }
         .badge.warning { background: rgba(245, 158, 11, 0.15); color: var(--accent-orange); border: 1px solid rgba(245, 158, 11, 0.3); }
         .badge.danger { background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); }
-
         .log-container {
             flex: 1;
             background: rgba(0, 0, 0, 0.3);
@@ -363,65 +280,37 @@
             border: 1px solid rgba(255,255,255,0.05);
             box-shadow: inset 0 4px 12px rgba(0,0,0,0.2);
         }
-        
         .log-entry { margin-bottom: 0.6rem; line-height: 1.4; opacity: 0.9; }
         .log-entry.error { color: #fca5a5; }
         .log-entry.warn { color: #fcd34d; }
-
         /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+</style>
+{% endblock %}
 
-    </style>
-</head>
-<body>
 
-    <div class="sidebar collapsed" id="sidebar">
-        <div class="sidebar-header">
-            <div class="sidebar-title">
-                <span style="font-size: 1.5rem; filter: drop-shadow(0 0 8px rgba(255,255,255,0.5));">🛡️</span> Admin Console
-            </div>
-            <button class="toggle-btn" onclick="toggleSidebar()" title="Toggle Sidebar">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="3" y1="12" x2="21" y2="12"></line>
-                    <line x1="3" y1="6" x2="21" y2="6"></line>
-                    <line x1="3" y1="18" x2="21" y2="18"></line>
-                </svg>
-            </button>
-        </div>
+{% block sidebar_sessions %}
         <div class="sidebar-action" style="padding: 1rem; border-bottom: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 0.5rem; justify-content: center; width: 100%;">
-            <button class="action-btn" onclick="openSessionsPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
-                <span>📋</span> <span class="sidebar-btn-text">Active Status</span>
-            </button>
-            <button class="action-btn" onclick="window.location.href='/admin/candidates-directory'" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
-                <span>👥</span> <span class="sidebar-btn-text">All Candidates</span>
-            </button>
-            <button class="action-btn" onclick="openConfigPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+            <button class="action-btn" data-tooltip="Configure Interview" onclick="openConfigPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='none'">
                 <span>⚙️</span> <span class="sidebar-btn-text">Configure Interview</span>
-            </button>
-            <button class="action-btn" onclick="window.location.href='/admin/voice-cloning'" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
-                <span>🎤</span> <span class="sidebar-btn-text">Voice Cloning</span>
             </button>
         </div>
         <div class="sessions-list" id="sessions-list">
             <!-- Populated by JS -->
             <div class="session-info" style="color:var(--text-secondary); padding: 1rem; text-align: center;">Loading...</div>
         </div>
-    </div>
+{% endblock %}
 
-    <div class="main-content">
-        <div class="topbar" style="display: flex; justify-content: space-between; align-items: center; padding-right: 3rem;">
-            <div id="topbar-title">Select a session to monitor</div>
-            <div class="manual-watch-container" style="display: flex; gap: 0.75rem; align-items: center;">
-                <input type="text" id="manual-candidate-id" placeholder="Enter Candidate ID" style="padding: 0.6rem 1rem; border-radius: 10px; border: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.05); color: var(--text-primary); outline: none; font-family: inherit; font-size: 0.95rem; width: 220px; transition: border-color 0.2s;" onfocus="this.style.borderColor='var(--accent-blue)'" onblur="this.style.borderColor='var(--glass-border)'">
-                <button onclick="watchManualCandidate()" style="padding: 0.6rem 1.2rem; border-radius: 10px; border: none; background: var(--accent-blue); color: white; font-weight: 600; font-family: inherit; font-size: 0.95rem; cursor: pointer; transition: opacity 0.2s;">Watch</button>
-            </div>
-        </div>
-        
-        <div class="content-area">
-            <div style="display: flex; flex-direction: column; gap: 1.5rem; overflow: hidden;">
+{% block topbar_content %}
+    <div id="topbar-title">Select a session to monitor</div>
+{% endblock %}
+
+{% block content %}
+<div class="content-area">
+<div style="display: flex; flex-direction: column; gap: 1.5rem; overflow: hidden;">
                 <div class="glass-card video-container" style="flex: 0 0 auto;">
                     <div class="no-video-overlay" id="no-video">
                         <span class="no-video-icon">📡</span>
@@ -436,7 +325,7 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5v14M22 10v4M7 5v14M2 10v4"/></svg>
                         Candidate Audio Wavelength
                     </div>
-                    <canvas id="audio-visualizer" width="800" height="60" style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);"></canvas>
+                    <canvas id="audio-visualizer" width="800" height="60" style="width: 100%; height: 60px; background: var(--glass-bg); border-radius: 8px; border: 1px solid var(--glass-border);"></canvas>
                 </div>
 
                 <!-- Text-Speech & Current Question -->
@@ -456,7 +345,7 @@
                         <div id="live-candidate-speech" style="font-size: 1.1rem; line-height: 1.5; color: var(--text-primary); font-style: italic;">Candidate is silent...</div>
                     </div>
 
-                    <div id="transcript-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div id="transcript-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: var(--glass-bg); border-radius: 8px; border: 1px solid var(--glass-border);">
                         <div style="color: var(--text-secondary); text-align: center; font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Live transcription will appear here...</div>
                     </div>
                 </div>
@@ -602,11 +491,161 @@
                     </div>
                 </div>
             </div>
+</div>
+
+    <!-- Modals -->
+<div id="sessions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div class="glass-card" style="width: 600px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.85);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
+                    <span>📋</span> Active Interview Sessions
+                </h2>
+                <button onclick="closeSessionsPopup()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem;" id="modal-sessions-content">
+                <!-- Session items listed here -->
+            </div>
+        </div>
+    </div>
+<div id="config-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
+        <div class="glass-card" style="width: 650px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.9);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
+                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
+                    <span>⚙️</span> Candidate Interview Configurator
+                </h2>
+                <button onclick="closeConfigPopup()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
+            </div>
+            
+            <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1.2rem; font-size: 0.95rem;">
+                <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
+                    <div style="flex: 1;">
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Candidate ID / User UUID</label>
+                        <input type="text" id="config-candidate-id" placeholder="e.g. candidate_123" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
+                    </div>
+                    <button onclick="loadConfigForCandidate()" style="padding:0.6rem 1.2rem; border-radius:10px; border:none; background:var(--accent-blue); color:white; font-weight:600; cursor:pointer;">Load Config</button>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0;">
+                    <label style="color:var(--text-primary); font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.5rem;">
+                        <input type="checkbox" id="config-is-active" style="width:18px; height:18px; accent-color:var(--accent-green);" checked>
+                        Interview Session Active
+                    </label>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Duration (mins)</label>
+                        <input type="number" id="config-duration" value="30" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Avatar Gender</label>
+                        <select id="config-gender" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Question Time Limit (secs)</label>
+                        <input type="number" id="config-time-limit" value="60" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Number of Questions</label>
+                        <input type="number" id="config-num-questions" value="5" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Objective</label>
+                    <textarea id="config-objective" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Assess engineering skills and culture fit.</textarea>
+                </div>
+
+                <div>
+                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Topics (comma-separated)</label>
+                    <textarea id="config-topics" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines</textarea>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Speech Language</label>
+                        <select id="config-speech-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="en-US">English (US)</option>
+                            <option value="es-ES">Spanish (Spain)</option>
+                            <option value="fr-FR">French (France)</option>
+                            <option value="pt-BR">Portuguese (Brazil)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Text / Question Language</label>
+                        <select id="config-text-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="pt">Portuguese</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 1rem;">
+                    <button onclick="closeConfigPopup()" style="padding:0.75rem 1.5rem; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--text-primary); font-weight:600; cursor:pointer;">Cancel</button>
+                    <button onclick="saveConfigForCandidate()" style="padding:0.75rem 1.5rem; border-radius:10px; border:none; background:var(--accent-green); color:white; font-weight:600; cursor:pointer;">Save Configurations</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script>
-        let currentWs = null;
+{% endblock %}
+
+{% block extra_js %}
+<script>
+
+        function copyTextFallback(text, btnEl) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        showCheckmark(btnEl);
+                    }).catch(err => {
+                        console.error("Clipboard API failed, using fallback.", err);
+                        doFallbackCopy(text, btnEl);
+                    });
+                } else {
+                    doFallbackCopy(text, btnEl);
+                }
+            } catch (e) {
+                console.error("Error copying text", e);
+                doFallbackCopy(text, btnEl);
+            }
+            
+            function doFallbackCopy(textToCopy, buttonEl) {
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCheckmark(buttonEl);
+                } catch (err) {
+                    console.error('Fallback copy failed', err);
+                    alert("Copy failed. Please copy manually: " + textToCopy);
+                }
+                document.body.removeChild(textArea);
+            }
+
+            function showCheckmark(btn) {
+                const oldHTML = btn.innerHTML;
+                btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent-green)" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+                setTimeout(() => {
+                    btn.innerHTML = oldHTML;
+                }, 2000);
+            }
+        }
+let currentWs = null;
         let activeSessionId = null;
 
         const audioDataPoints = [];
@@ -657,7 +696,7 @@
             el.style.lineHeight = '1.4';
             
             if (role === 'candidate') {
-                el.style.background = 'rgba(255,255,255,0.05)';
+                el.style.background = 'var(--glass-bg)';
                 el.style.borderLeft = '3px solid var(--accent-green)';
                 el.innerHTML = `<div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">Candidate</div>${text}`;
             } else {
@@ -726,12 +765,20 @@
             }
         }
 
+        function toggleDashboardTheme() {
+            const html = document.documentElement;
+            const current = html.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            html.setAttribute('data-theme', next);
+            document.getElementById('theme-icon').textContent = next === 'dark' ? '☀️' : '🌙';
+        }
+
         function selectSession(id) {
             if (activeSessionId === id) return;
             activeSessionId = id;
             
             document.getElementById('print-row').style.display = 'flex';
-            document.getElementById('topbar-title').innerHTML = `Monitoring Session: <span style="color:var(--accent-blue); margin-left:0.5rem;">${id}</span>`;
+            document.getElementById('topbar-title').innerHTML = `<div style="display:flex; align-items:center;">Monitoring Session: <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 6px; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.5rem; font-family: monospace; font-size: 0.75rem; margin-left: 0.5rem; height: 26px;"><span style="color: var(--text-primary); opacity: 0.9;">${id}</span><button onclick="copyTextFallback('${id}', this)" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 4px; transition: color 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'" title="Copy UUID"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>`;
             document.getElementById('no-video').style.display = 'flex';
             document.getElementById('cv-feed').style.display = 'none';
             document.getElementById('event-logs').innerHTML = '';
@@ -1460,7 +1507,7 @@
                 let html = `
                     <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
                         <thead>
-                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                            <tr style="border-bottom: 1px solid var(--glass-border); text-align:left;">
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Candidate ID</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Strikes</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Status</th>
@@ -1473,7 +1520,7 @@
                 data.active_sessions_details.forEach(s => {
                     const statusClass = s.status === 'Live' ? 'ok' : 'danger';
                     html += `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                        <tr style="border-bottom: 1px solid var(--glass-border); transition:background 0.2s;">
                             <td style="padding:12px 10px; font-weight:500; font-family:monospace;">${s.candidate_id}</td>
                             <td style="padding:12px 10px; font-weight:600; color:var(--accent-orange);">${s.strikes}</td>
                             <td style="padding:12px 10px;"><span class="badge ${statusClass}">${s.status}</span></td>
@@ -1541,7 +1588,7 @@
                 let html = `
                     <table style="width:100%; border-collapse:collapse; margin-top:1rem; font-size:0.9rem;">
                         <thead>
-                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                            <tr style="border-bottom: 1px solid var(--glass-border); text-align:left;">
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Name</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Job Specialty</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Duration</th>
@@ -1557,7 +1604,7 @@
                     const statusClass = c.is_active ? 'ok' : 'danger';
                     const statusText = c.is_active ? 'Active' : 'Inactive';
                     html += `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                        <tr style="border-bottom: 1px solid var(--glass-border); transition:background 0.2s;">
                             <td style="padding:12px 10px; font-weight:500;">${c.candidate_name || 'N/A'}</td>
                             <td style="padding:12px 10px; color:var(--text-secondary);">${c.job_specialty || 'N/A'}</td>
                             <td style="padding:12px 10px;">${c.interview_duration_minutes} min</td>
@@ -1636,27 +1683,58 @@
         }
 
         function openConfigPopup() {
-            const modal = document.getElementById('config-modal');
-            modal.style.display = 'flex';
-            setTimeout(() => {
-                modal.style.opacity = '1';
-            }, 10);
-            
-            const input = document.getElementById('config-candidate-id');
-            if (activeSessionId) {
-                input.value = activeSessionId;
-                loadConfigForCandidate(activeSessionId);
-            } else {
-                input.value = '';
-                document.getElementById('config-is-active').checked = true;
-                document.getElementById('config-duration').value = 30;
-                document.getElementById('config-gender').value = 'female';
-                document.getElementById('config-time-limit').value = 60;
-                document.getElementById('config-num-questions').value = 5;
-                document.getElementById('config-objective').value = 'Assess engineering skills and culture fit.';
-                document.getElementById('config-topics').value = 'Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines';
-                document.getElementById('config-speech-lang').value = 'en-US';
-                document.getElementById('config-text-lang').value = 'en';
+            try {
+                const modal = document.getElementById('config-modal');
+                if (!modal) {
+                    alert("Error: config-modal element not found in DOM!");
+                    return;
+                }
+                modal.style.display = 'flex';
+                setTimeout(() => {
+                    modal.style.opacity = '1';
+                }, 10);
+                
+                const input = document.getElementById('config-candidate-id');
+                if (!input) {
+                    console.error("config-candidate-id not found");
+                    return;
+                }
+
+                if (activeSessionId) {
+                    input.value = activeSessionId;
+                    loadConfigForCandidate(activeSessionId);
+                } else {
+                    input.value = '';
+                    const isActiveEl = document.getElementById('config-is-active');
+                    if (isActiveEl) isActiveEl.checked = true;
+                    
+                    const durationEl = document.getElementById('config-duration');
+                    if (durationEl) durationEl.value = 30;
+                    
+                    const genderEl = document.getElementById('config-gender');
+                    if (genderEl) genderEl.value = 'female';
+                    
+                    const timeLimitEl = document.getElementById('config-time-limit');
+                    if (timeLimitEl) timeLimitEl.value = 60;
+                    
+                    const numQEl = document.getElementById('config-num-questions');
+                    if (numQEl) numQEl.value = 5;
+                    
+                    const objEl = document.getElementById('config-objective');
+                    if (objEl) objEl.value = 'Assess engineering skills and culture fit.';
+                    
+                    const topicsEl = document.getElementById('config-topics');
+                    if (topicsEl) topicsEl.value = 'Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines';
+                    
+                    const speechLangEl = document.getElementById('config-speech-lang');
+                    if (speechLangEl) speechLangEl.value = 'en-US';
+                    
+                    const textLangEl = document.getElementById('config-text-lang');
+                    if (textLangEl) textLangEl.value = 'en';
+                }
+            } catch (e) {
+                console.error("Error in openConfigPopup:", e);
+                alert("Error opening modal: " + e.message);
             }
         }
 
@@ -1741,113 +1819,5 @@
             }
         });
         setInterval(fetchSessions, 5000);
-    </script>
-    
-    <!-- Beautiful Glassmorphic Modal -->
-    <div id="sessions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
-        <div class="glass-card" style="width: 600px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.85);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
-                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
-                    <span>📋</span> Active Interview Sessions
-                </h2>
-                <button onclick="closeSessionsPopup()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
-            </div>
-            
-            <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem;" id="modal-sessions-content">
-                <!-- Session items listed here -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Beautiful Configuration Modal -->
-    <div id="config-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
-        <div class="glass-card" style="width: 650px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.9);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
-                <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
-                    <span>⚙️</span> Candidate Interview Configurator
-                </h2>
-                <button onclick="closeConfigPopup()" style="background: none; border: none; color: var(--text-secondary); font-size: 1.5rem; cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--accent-red)'" onmouseout="this.style.color='var(--text-secondary)'">&times;</button>
-            </div>
-            
-            <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem; display: flex; flex-direction: column; gap: 1.2rem; font-size: 0.95rem;">
-                <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
-                    <div style="flex: 1;">
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Candidate ID / User UUID</label>
-                        <input type="text" id="config-candidate-id" placeholder="e.g. candidate_123" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
-                    </div>
-                    <button onclick="loadConfigForCandidate()" style="padding:0.6rem 1.2rem; border-radius:10px; border:none; background:var(--accent-blue); color:white; font-weight:600; cursor:pointer;">Load Config</button>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 1rem; padding: 0.5rem 0;">
-                    <label style="color:var(--text-primary); font-weight:600; cursor:pointer; display:flex; align-items:center; gap:0.5rem;">
-                        <input type="checkbox" id="config-is-active" style="width:18px; height:18px; accent-color:var(--accent-green);" checked>
-                        Interview Session Active
-                    </label>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Duration (mins)</label>
-                        <input type="number" id="config-duration" value="30" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Avatar Gender</label>
-                        <select id="config-gender" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
-                            <option value="female">Female</option>
-                            <option value="male">Male</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Question Time Limit (secs)</label>
-                        <input type="number" id="config-time-limit" value="60" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Number of Questions</label>
-                        <input type="number" id="config-num-questions" value="5" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
-                    </div>
-                </div>
-
-                <div>
-                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Objective</label>
-                    <textarea id="config-objective" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Assess engineering skills and culture fit.</textarea>
-                </div>
-
-                <div>
-                    <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Topics (comma-separated)</label>
-                    <textarea id="config-topics" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines</textarea>
-                </div>
-
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Speech Language</label>
-                        <select id="config-speech-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
-                            <option value="en-US">English (US)</option>
-                            <option value="es-ES">Spanish (Spain)</option>
-                            <option value="fr-FR">French (France)</option>
-                            <option value="pt-BR">Portuguese (Brazil)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Text / Question Language</label>
-                        <select id="config-text-lang" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(15,23,42,0.9); color:var(--text-primary); outline:none;">
-                            <option value="en">English</option>
-                            <option value="es">Spanish</option>
-                            <option value="fr">French</option>
-                            <option value="pt">Portuguese</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 1rem;">
-                    <button onclick="closeConfigPopup()" style="padding:0.75rem 1.5rem; border-radius:10px; border:1px solid var(--glass-border); background:transparent; color:var(--text-primary); font-weight:600; cursor:pointer;">Cancel</button>
-                    <button onclick="saveConfigForCandidate()" style="padding:0.75rem 1.5rem; border-radius:10px; border:none; background:var(--accent-green); color:white; font-weight:600; cursor:pointer;">Save Configurations</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    </div>
-</body>
-</html>
+</script>
+{% endblock %}

@@ -1,17 +1,36 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Interview Console</title>
+    <title>KIMET.AI - AI Interview Platform</title>
+    <link rel="icon" type="image/png" href="/static/kimet-favicon-black.png" />
     <meta name="description" content="AI-powered interview monitoring with gaze tracking and compliance verification">
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/three@0.147.0/build/three.min.js"></script>
     <script src="https://unpkg.com/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://unpkg.com/@pixiv/three-vrm@1.0.9/lib/three-vrm.min.js"></script>
     <style>
         {% include 'styles.css' %}
         {% include 'components.css' %}
+        
+        /* Light Theme Overrides explicitly for candidate page */
+        :root, [data-theme="light"] {
+            --bg-gradient: #ffffff !important;
+            --bg-card: #f8fafc !important;
+            --bg-body: #f1f5f9 !important;
+            --text-primary: #0f172a !important;
+            --text-secondary: #64748b !important;
+            --border-color: rgba(0, 0, 0, 0.1) !important;
+            --bg-secondary: #f8fafc !important;
+            --text-muted: #94a3b8 !important;
+        }
+        body { background: #ffffff !important; color: #0f172a !important; font-family: 'Inter', 'Outfit', sans-serif; }
+        .app-header { background: #f8fafc !important; border-bottom: 1px solid rgba(0,0,0,0.1) !important; }
+        .card, .question-card, .avatar-wrapper { background: #ffffff !important; border: 1px solid rgba(0,0,0,0.1) !important; box-shadow: 0 4px 12px rgba(0,0,0,0.05) !important; }
+        .audio-toggle { background: #f1f5f9 !important; color: #0f172a !important; }
+        .timer-display { background: #f1f5f9 !important; color: #0f172a !important; }
+        .env-item { background: #f8fafc !important; border-color: rgba(0,0,0,0.1) !important; color: #0f172a !important; }
         
         /* Modern Layout Additions */
         .interview-grid {
@@ -249,9 +268,9 @@
 <body>
     <!-- Header -->
     <header class="app-header">
-        <div class="app-logo">
-            <div class="logo-icon">🎯</div>
-            <span class="logo-text">Interview AI</span>
+        <div class="app-logo" style="display: flex; align-items: center; gap: 0.5rem;">
+            <img src="/static/kimet-logo.png" alt="KIMET.AI" style="height: 32px; width: 32px; object-fit: contain; border-radius: 50%; background: #fff; border: 3px solid #000; padding: 2px;" />
+            <span class="logo-text" style="font-weight: 700; font-family: 'Outfit', sans-serif;">KIMET.AI</span>
         </div>
         <div class="header-controls">
             <label class="audio-toggle">

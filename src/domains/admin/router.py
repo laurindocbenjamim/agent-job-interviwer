@@ -90,6 +90,24 @@ async def clone_voice(file: UploadFile = File(...)):
     return {"status": "success", "message": "Voice cloned successfully.", "filename": file.filename}
 
 
+@router.get("/voice/file")
+async def get_cloned_voice():
+    from fastapi.responses import FileResponse
+    voice_path = os.path.join(VOICE_DIR, "cloned_voice.wav")
+    if os.path.exists(voice_path):
+        return FileResponse(voice_path, media_type="audio/wav")
+    raise HTTPException(status_code=404, detail="No cloned voice found.")
+
+
+@router.delete("/voice/file")
+async def delete_cloned_voice():
+    voice_path = os.path.join(VOICE_DIR, "cloned_voice.wav")
+    if os.path.exists(voice_path):
+        os.remove(voice_path)
+        return {"status": "success", "message": "Cloned voice deleted."}
+    raise HTTPException(status_code=404, detail="No cloned voice found.")
+
+
 @router.post("/inject-question/{candidate_id}")
 async def admin_inject_question(candidate_id: str, payload: InjectedQuestion):
     from src.domains.interviews.ai.agent import queue_injected_question

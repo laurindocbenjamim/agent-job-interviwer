@@ -39,6 +39,9 @@ app = FastAPI(
 )
 
 from src.config.settings import settings
+from fastapi.staticfiles import StaticFiles
+
+app.mount("/static", StaticFiles(directory="src/shared/static"), name="static")
 
 app.add_middleware(
     CORSMiddleware,

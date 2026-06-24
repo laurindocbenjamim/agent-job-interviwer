@@ -1,50 +1,102 @@
 .admin-monitoring-container {
   min-height: 100vh;
-  background-color: #050505;
-  color: #fff;
+  background-color: var(--bg);
+  color: var(--text-h);
   padding: 2rem;
   font-family: 'Outfit', sans-serif;
 }
 
 .monitoring-header {
-  margin-bottom: 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  padding: 24px 32px;
 }
 
-.monitoring-header h1 {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #fff;
-  margin: 0;
+.header-content h1 {
+  font-size: 24px;
+  margin-bottom: 8px;
 }
 
-.session-id {
-  color: #3b82f6;
+.session-id-badge {
+  display: inline-block;
+  background: var(--code-bg);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-family: var(--mono);
+  font-size: 14px;
+  color: var(--text);
+  border: 1px solid var(--border);
 }
 
 .session-times {
   display: flex;
-  gap: 1rem;
-  margin-top: 0.5rem;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+}
+
+.status-dot.active {
+  background: #10b981;
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.4);
 }
 
 .time-badge {
-  font-size: 0.85rem;
-  padding: 0.25rem 0.75rem;
-  border-radius: 1rem;
-  background: rgba(255, 255, 255, 0.1);
-  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  background: var(--code-bg);
+  padding: 6px 12px;
+  border-radius: 20px;
+  color: var(--text-h);
 }
 
-.monitoring-content {
+.monitoring-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 1024px) {
+  .monitoring-grid {
+    grid-template-columns: 1fr;
+  }
+  .monitoring-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+  }
+  .session-times {
+    align-items: flex-start;
+  }
+}
+
+.monitoring-card {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
-  max-width: 1000px;
 }
 
 .video-feed-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: 1rem;
   aspect-ratio: 16/9;
   display: flex;
@@ -79,35 +131,85 @@
 }
 
 .audio-wavelength-card, .actions-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: 0.75rem;
   padding: 1.5rem;
 }
 
 .card-header {
+  margin-bottom: 24px;
+}
+
+.card-header h3 {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  font-size: 0.75rem;
+  gap: 10px;
+  font-size: 18px;
+  margin: 0;
+}
+
+.text-accent {
+  color: var(--accent);
+}
+
+.audio-visualizer-container {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-grow: 1;
+  justify-content: center;
+  padding: 24px;
+  background: var(--code-bg);
+  border-radius: 12px;
+}
+
+.audio-level-text {
+  font-family: var(--mono);
+  font-size: 32px;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  color: #94a3b8;
-  margin-bottom: 1rem;
+  color: var(--accent);
+  width: 80px;
+  text-align: right;
 }
 
 .audio-visualizer {
-  height: 30px;
-  background: rgba(0, 0, 0, 0.5);
-  border-radius: 4px;
+  height: 120px;
+  width: 100px;
+  background: var(--bg);
+  border-radius: 12px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
   overflow: hidden;
-  position: relative;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .audio-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #10b981);
-  transition: width 0.1s ease, opacity 0.1s ease;
+  width: 100%;
+  background: linear-gradient(to top, #a855f7, #ec4899);
+  transition: height 0.1s ease-out, opacity 0.1s ease-out;
+  border-radius: 4px 4px 0 0;
+}
+
+.card-body.centered {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  flex-grow: 1;
+  text-align: center;
+  padding: 24px;
+}
+
+.action-desc {
+  color: var(--text);
+  margin-bottom: 24px;
+  max-width: 300px;
+}
+
+.mt-4 {
+  margin-top: 16px;
 }
 
 .btn-primary {

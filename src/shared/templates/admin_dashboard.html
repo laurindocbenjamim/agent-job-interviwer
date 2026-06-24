@@ -254,7 +254,7 @@
             font-weight: 600;
             font-family: 'Outfit', sans-serif;
             font-size: 1.2rem;
-            color: #fff;
+            color: var(--text-primary);
         }
         .badge {
             padding: 0.4rem 1rem;
@@ -294,7 +294,7 @@
 
 {% block sidebar_sessions %}
         <div class="sidebar-action" style="padding: 1rem; border-bottom: 1px solid var(--glass-border); display: flex; flex-direction: column; gap: 0.5rem; justify-content: center; width: 100%;">
-            <button class="action-btn" data-tooltip="Configure Interview" onclick="openConfigPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.08)'" onmouseout="this.style.background='rgba(255,255,255,0.03)'">
+            <button class="action-btn" data-tooltip="Configure Interview" onclick="openConfigPopup()" style="width: 100%; padding: 0.75rem; border-radius: 12px; border: 1px solid var(--glass-border); background: var(--glass-bg); color: var(--text-primary); font-weight: 600; font-family: inherit; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; transition: all 0.2s;" onmouseover="this.style.filter='brightness(1.2)'" onmouseout="this.style.filter='none'">
                 <span>⚙️</span> <span class="sidebar-btn-text">Configure Interview</span>
             </button>
         </div>
@@ -325,7 +325,7 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5v14M22 10v4M7 5v14M2 10v4"/></svg>
                         Candidate Audio Wavelength
                     </div>
-                    <canvas id="audio-visualizer" width="800" height="60" style="width: 100%; height: 60px; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);"></canvas>
+                    <canvas id="audio-visualizer" width="800" height="60" style="width: 100%; height: 60px; background: var(--glass-bg); border-radius: 8px; border: 1px solid var(--glass-border);"></canvas>
                 </div>
 
                 <!-- Text-Speech & Current Question -->
@@ -345,7 +345,7 @@
                         <div id="live-candidate-speech" style="font-size: 1.1rem; line-height: 1.5; color: var(--text-primary); font-style: italic;">Candidate is silent...</div>
                     </div>
 
-                    <div id="transcript-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: rgba(0,0,0,0.3); border-radius: 8px; border: 1px solid rgba(255,255,255,0.05);">
+                    <div id="transcript-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; padding: 1rem; background: var(--glass-bg); border-radius: 8px; border: 1px solid var(--glass-border);">
                         <div style="color: var(--text-secondary); text-align: center; font-size: 0.9rem; margin-top: auto; margin-bottom: auto;">Live transcription will appear here...</div>
                     </div>
                 </div>
@@ -496,7 +496,7 @@
     <!-- Modals -->
 <div id="sessions-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
         <div class="glass-card" style="width: 600px; max-width: 90%; max-height: 80vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.85);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
                 <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
                     <span>📋</span> Active Interview Sessions
                 </h2>
@@ -510,7 +510,7 @@
     </div>
 <div id="config-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s ease;">
         <div class="glass-card" style="width: 650px; max-width: 95%; max-height: 90vh; display: flex; flex-direction: column; padding: 2rem; border-radius: 24px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); border: 1px solid var(--glass-border); background: rgba(15, 23, 42, 0.9);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 1rem;">
                 <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 0.75rem;">
                     <span>⚙️</span> Candidate Interview Configurator
                 </h2>
@@ -521,7 +521,7 @@
                 <div style="display: flex; gap: 0.75rem; align-items: flex-end;">
                     <div style="flex: 1;">
                         <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Candidate ID / User UUID</label>
-                        <input type="text" id="config-candidate-id" placeholder="e.g. candidate_123" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                        <input type="text" id="config-candidate-id" placeholder="e.g. candidate_123" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
                     </div>
                     <button onclick="loadConfigForCandidate()" style="padding:0.6rem 1.2rem; border-radius:10px; border:none; background:var(--accent-blue); color:white; font-weight:600; cursor:pointer;">Load Config</button>
                 </div>
@@ -536,7 +536,7 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
                         <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Duration (mins)</label>
-                        <input type="number" id="config-duration" value="30" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                        <input type="number" id="config-duration" value="30" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
                     </div>
                     <div>
                         <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Avatar Gender</label>
@@ -550,22 +550,22 @@
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
                     <div>
                         <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Question Time Limit (secs)</label>
-                        <input type="number" id="config-time-limit" value="60" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                        <input type="number" id="config-time-limit" value="60" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
                     </div>
                     <div>
                         <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Number of Questions</label>
-                        <input type="number" id="config-num-questions" value="5" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none;">
+                        <input type="number" id="config-num-questions" value="5" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none;">
                     </div>
                 </div>
 
                 <div>
                     <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Interview Objective</label>
-                    <textarea id="config-objective" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Assess engineering skills and culture fit.</textarea>
+                    <textarea id="config-objective" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Assess engineering skills and culture fit.</textarea>
                 </div>
 
                 <div>
                     <label style="display:block; margin-bottom:0.4rem; color:var(--text-secondary); font-weight:500;">Topics (comma-separated)</label>
-                    <textarea id="config-topics" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:rgba(255,255,255,0.05); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines</textarea>
+                    <textarea id="config-topics" rows="2" style="width:100%; padding:0.6rem 1rem; border-radius:10px; border:1px solid var(--glass-border); background:var(--glass-bg); color:var(--text-primary); outline:none; resize:vertical; font-family:inherit;">Experience with FastAPI and Async Python,System design concepts,Handling real-time streaming data pipelines</textarea>
                 </div>
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
@@ -696,7 +696,7 @@ let currentWs = null;
             el.style.lineHeight = '1.4';
             
             if (role === 'candidate') {
-                el.style.background = 'rgba(255,255,255,0.05)';
+                el.style.background = 'var(--glass-bg)';
                 el.style.borderLeft = '3px solid var(--accent-green)';
                 el.innerHTML = `<div style="font-size:0.75rem; color:var(--text-secondary); margin-bottom:0.25rem;">Candidate</div>${text}`;
             } else {
@@ -778,7 +778,7 @@ let currentWs = null;
             activeSessionId = id;
             
             document.getElementById('print-row').style.display = 'flex';
-            document.getElementById('topbar-title').innerHTML = `<div style="display:flex; align-items:center;">Monitoring Session: <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.5rem; font-family: monospace; font-size: 0.85rem; margin-left: 0.5rem; height: 26px;"><span style="color: var(--text-primary); opacity: 0.9;">${id}</span><button onclick="copyTextFallback('${id}', this)" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 4px; transition: color 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'" title="Copy UUID"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>`;
+            document.getElementById('topbar-title').innerHTML = `<div style="display:flex; align-items:center;">Monitoring Session: <div style="background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 6px; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.5rem; font-family: monospace; font-size: 0.75rem; margin-left: 0.5rem; height: 26px;"><span style="color: var(--text-primary); opacity: 0.9;">${id}</span><button onclick="copyTextFallback('${id}', this)" style="background: transparent; border: none; color: var(--text-secondary); cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; border-radius: 4px; transition: color 0.2s;" onmouseover="this.style.color='var(--text-primary)'" onmouseout="this.style.color='var(--text-secondary)'" title="Copy UUID"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button></div></div>`;
             document.getElementById('no-video').style.display = 'flex';
             document.getElementById('cv-feed').style.display = 'none';
             document.getElementById('event-logs').innerHTML = '';
@@ -1507,7 +1507,7 @@ let currentWs = null;
                 let html = `
                     <table style="width:100%; border-collapse:collapse; margin-top:1rem;">
                         <thead>
-                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                            <tr style="border-bottom: 1px solid var(--glass-border); text-align:left;">
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Candidate ID</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Strikes</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Status</th>
@@ -1520,7 +1520,7 @@ let currentWs = null;
                 data.active_sessions_details.forEach(s => {
                     const statusClass = s.status === 'Live' ? 'ok' : 'danger';
                     html += `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                        <tr style="border-bottom: 1px solid var(--glass-border); transition:background 0.2s;">
                             <td style="padding:12px 10px; font-weight:500; font-family:monospace;">${s.candidate_id}</td>
                             <td style="padding:12px 10px; font-weight:600; color:var(--accent-orange);">${s.strikes}</td>
                             <td style="padding:12px 10px;"><span class="badge ${statusClass}">${s.status}</span></td>
@@ -1588,7 +1588,7 @@ let currentWs = null;
                 let html = `
                     <table style="width:100%; border-collapse:collapse; margin-top:1rem; font-size:0.9rem;">
                         <thead>
-                            <tr style="border-bottom:1px solid rgba(255,255,255,0.1); text-align:left;">
+                            <tr style="border-bottom: 1px solid var(--glass-border); text-align:left;">
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Name</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Job Specialty</th>
                                 <th style="padding:10px; color:var(--text-secondary); font-weight:600;">Duration</th>
@@ -1604,7 +1604,7 @@ let currentWs = null;
                     const statusClass = c.is_active ? 'ok' : 'danger';
                     const statusText = c.is_active ? 'Active' : 'Inactive';
                     html += `
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05); transition:background 0.2s;">
+                        <tr style="border-bottom: 1px solid var(--glass-border); transition:background 0.2s;">
                             <td style="padding:12px 10px; font-weight:500;">${c.candidate_name || 'N/A'}</td>
                             <td style="padding:12px 10px; color:var(--text-secondary);">${c.job_specialty || 'N/A'}</td>
                             <td style="padding:12px 10px;">${c.interview_duration_minutes} min</td>

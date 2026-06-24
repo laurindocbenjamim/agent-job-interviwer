@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { useWebRTC } from './hooks/useWebRTC';
-import { Video, VideoOff, Mic, Clock, Send, Save } from 'lucide-react';
+import { Video, VideoOff, Mic, Clock, Send, Save, Activity, CheckCircle2 } from 'lucide-react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Environment } from '@react-three/drei';
 import { AgentAvatar } from './components/AgentAvatar';
@@ -15,12 +15,12 @@ export const InterviewPage: React.FC = () => {
     localVideoRef, 
     isStarted, 
     status, 
-    isAudioEnabled,
     startTime,
     endTime,
     startInterview, 
     submitAnswer,
-    finalizeSession
+    finalizeSession,
+    agentMessage
   } = useWebRTC(candidateId || 'default');
 
   const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT);
@@ -28,7 +28,7 @@ export const InterviewPage: React.FC = () => {
 
   // Timer logic
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (isStarted && isAnswering && timeLeft > 0) {
       timer = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
@@ -62,17 +62,37 @@ export const InterviewPage: React.FC = () => {
     return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
+  // Enforce light theme for this page
+  useEffect(() => {
+    const originalTheme = document.documentElement.getAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', 'light');
+    document.body.classList.add('force-white-bg');
+    
+    return () => {
+      if (originalTheme) {
+        document.documentElement.setAttribute('data-theme', originalTheme);
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+      }
+      document.body.classList.remove('force-white-bg');
+    };
+  }, []);
+
   return (
     <div className="interview-container">
       <header className="interview-header">
-        <h1 className="title-gradient">Interview AI</h1>
+        <div className="logo-container">
+          <div className="logo-icon-small">K</div>
+          <h1 className="title-gradient">KIMET.AI Interview</h1>
+        </div>
         <div className="status-badges flex gap-4 items-center">
-          {startTime && <span className="text-sm text-slate-400">Started: {new Date(startTime).toLocaleTimeString()}</span>}
-          {endTime && <span className="text-sm text-slate-400">Ended: {new Date(endTime).toLocaleTimeString()}</span>}
-          <span className={`status-badge ${status}`}>
+          {startTime && <span className="text-sm text-slate-500">Started: {new Date(startTime).toLocaleTimeString()}</span>}
+          {endTime && <span className="text-sm text-slate-500">Ended: {new Date(endTime).toLocaleTimeString()}</span>}
+          <span className={`status-badge ${status.toLowerCase()}`}>
+            <Activity size={14} className="pulse-icon" />
             {status.toUpperCase()}
           </span>
-          {isStarted && (
+          {isStarted && !agentMessage?.interview_complete && (
             <button onClick={finalizeSession} className="btn-danger flex items-center gap-2 px-4 py-2">
               <Save size={16} /> Finalize Interview
             </button>
@@ -83,76 +103,86 @@ export const InterviewPage: React.FC = () => {
       <div className="interview-layout-structured">
         {/* Left Side: Cameras & Avatars */}
         <div className="sidebar-cameras">
-          <div className="video-wrapper small">
-            <video
-              ref={localVideoRef}
-              autoPlay
-              playsInline
-              muted
-              className={`video-element ${!isStarted ? 'hidden' : ''}`}
-            />
+          <div className="camera-card glass-panel">
+            <h3 className="camera-title">Your Feed</h3>
+            <div className="video-wrapper small">
+              <video
+                ref={localVideoRef}
+                autoPlay
+                playsInline
+                muted
+                className={`video-element ${!isStarted ? 'hidden' : ''}`}
+              />
+              {!isStarted && (
+                <div className="video-placeholder">
+                  <VideoOff size={32} />
+                  <p>Camera Off</p>
+                </div>
+              )}
+            </div>
+            
             {!isStarted && (
-              <div className="video-placeholder">
-                <VideoOff size={32} />
-                <p>Camera Off</p>
+              <div className="controls mt-4 w-full">
+                <button onClick={startInterview} className="btn-primary w-full justify-center">
+                  <Video size={20} /> Start Session
+                </button>
               </div>
             )}
           </div>
           
-          <div className="video-wrapper small bg-slate-900 flex items-center justify-center overflow-hidden">
-            {!isStarted ? (
-              <div className="video-placeholder">
-                <p>AI Offline</p>
-              </div>
-            ) : (
-              <Canvas camera={{ position: [0, 0, 3], fov: 40 }}>
-                <ambientLight intensity={0.5} />
-                <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
-                <Environment preset="city" />
-                <AgentAvatar agentMessage={agentMessage} />
-                <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
-              </Canvas>
-            )}
-          </div>
-
-          <div className="controls mt-4 w-full">
-            {!isStarted && (
-              <button onClick={startInterview} className="btn-primary w-full justify-center">
-                <Video size={20} /> Start Session
-              </button>
-            )}
+          <div className="camera-card glass-panel">
+            <h3 className="camera-title">AI Interviewer</h3>
+            <div className="video-wrapper small ai-wrapper overflow-hidden">
+              {!isStarted ? (
+                <div className="video-placeholder">
+                  <p>AI Offline</p>
+                </div>
+              ) : (
+                <Canvas camera={{ position: [0, 0, 3], fov: 40 }}>
+                  <ambientLight intensity={0.5} />
+                  <spotLight position={[10, 10, 10]} angle={0.15} penumbra={1} />
+                  <Environment preset="city" />
+                  <AgentAvatar agentMessage={agentMessage} />
+                  <OrbitControls enableZoom={false} enablePan={false} minPolarAngle={Math.PI / 2} maxPolarAngle={Math.PI / 2} />
+                </Canvas>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Center: Question Panel */}
         <div className="main-question-panel">
           {isStarted ? (
-            <div className="question-card">
+            <div className="question-card glass-panel">
               <div className="question-header">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-slate-200">
-                  <Mic size={24} className="text-blue-400" />
+                <h2 className="topic-title">
+                  <Mic size={24} className="text-accent" />
                   {agentMessage?.current_topic || "Initializing..."}
                 </h2>
                 
                 {isAnswering && (
-                  <div className={`timer-display ${timeLeft < 30 ? 'text-red-400' : 'text-slate-300'}`}>
+                  <div className={`timer-display ${timeLeft < 30 ? 'text-red-500' : 'text-slate-600'}`}>
                     <Clock size={20} />
                     <span className="font-mono text-2xl">{formatTime(timeLeft)}</span>
                   </div>
                 )}
               </div>
 
-              <div className="question-body my-8 p-6 bg-slate-800 rounded-lg border border-slate-700 min-h-[200px] flex items-center justify-center">
-                <p className="text-2xl text-center leading-relaxed text-slate-100">
+              <div className="question-body">
+                <p className="question-text">
                   {agentMessage?.text_to_speak || "Please wait while the AI Interviewer analyzes your profile..."}
                 </p>
               </div>
 
               {agentMessage?.interview_complete ? (
-                <div className="text-center">
-                  <h3 className="text-green-400 text-xl font-bold mb-4">Interview Complete</h3>
+                <div className="completion-area">
+                  <div className="completion-icon">
+                    <CheckCircle2 size={48} />
+                  </div>
+                  <h3>Interview Complete</h3>
+                  <p>Thank you for your time. Your responses have been recorded.</p>
                   <button onClick={finalizeSession} className="btn-primary px-8 py-3 text-lg">
-                    Submit & Finalize
+                    Submit & Return
                   </button>
                 </div>
               ) : (
@@ -160,7 +190,7 @@ export const InterviewPage: React.FC = () => {
                   <button 
                     onClick={handleSubmit} 
                     disabled={!isAnswering}
-                    className={`btn-primary flex items-center gap-2 px-8 py-3 text-lg ${!isAnswering ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    className={`btn-primary flex items-center gap-2 px-8 py-3 text-lg ${!isAnswering ? 'disabled' : ''}`}
                   >
                     <Send size={20} /> Submit Answer
                   </button>
@@ -168,8 +198,15 @@ export const InterviewPage: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-slate-500">
-              <p className="text-xl">Click "Start Session" to begin the interview.</p>
+            <div className="empty-state glass-panel">
+              <div className="empty-state-icon">
+                <Video size={48} />
+              </div>
+              <h2>Ready for your interview?</h2>
+              <p>Make sure you are in a quiet room with good lighting. Click "Start Session" when you are ready to begin.</p>
+              <button onClick={startInterview} className="btn-primary mt-4">
+                Start Session
+              </button>
             </div>
           )}
         </div>

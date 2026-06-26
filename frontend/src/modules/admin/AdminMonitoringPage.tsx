@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { Activity, Clock, FileText, CheckCircle2, Copy } from 'lucide-react';
+import { API_BASE_URL, WS_BASE_URL } from '../../config';
 import './AdminMonitoringPage.css';
 
 export const AdminMonitoringPage: React.FC = () => {
@@ -14,7 +15,7 @@ export const AdminMonitoringPage: React.FC = () => {
     if (!candidateId) return;
     
     setStatus('Establishing secure connection...');
-    const ws = new WebSocket(`ws://localhost:8000/admin/ws/interview/${candidateId}`);
+    const ws = new WebSocket(`${WS_BASE_URL}/admin/ws/interview/${candidateId}`);
     
     ws.onmessage = (event) => {
       try {
@@ -114,7 +115,7 @@ export const AdminMonitoringPage: React.FC = () => {
             <p className="action-desc">Generate a comprehensive summary report of the candidate's performance after the interview is complete.</p>
             <button 
               className="btn-primary w-full mt-4"
-              onClick={() => window.open(`http://localhost:8000/admin/report/${candidateId}/pdf`, '_blank')}
+              onClick={() => window.open(`${API_BASE_URL}/admin/report/${candidateId}/pdf`, '_blank')}
             >
               <FileText size={18} /> Print PDF Report
             </button>

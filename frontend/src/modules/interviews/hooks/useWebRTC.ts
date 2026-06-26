@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { API_BASE_URL } from '../../../config';
 
 export function useWebRTC(candidateId: string) {
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -71,7 +72,7 @@ export function useWebRTC(candidateId: string) {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
-      const response = await fetch(`http://localhost:8000/interview/${candidateId}/offer`, {
+      const response = await fetch(`${API_BASE_URL}/interview/${candidateId}/offer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -99,7 +100,7 @@ export function useWebRTC(candidateId: string) {
 
   const startInterview = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/interview/${candidateId}/start`, {
+      const res = await fetch(`${API_BASE_URL}/interview/${candidateId}/start`, {
         method: 'POST'
       });
       const data = await res.json();
@@ -132,7 +133,7 @@ export function useWebRTC(candidateId: string) {
 
   const submitAnswer = async () => {
     try {
-      await fetch(`http://localhost:8000/interview/${candidateId}/submit`, {
+      await fetch(`${API_BASE_URL}/interview/${candidateId}/submit`, {
         method: 'POST'
       });
     } catch (err) {
@@ -142,7 +143,7 @@ export function useWebRTC(candidateId: string) {
 
   const finalizeSession = async () => {
     try {
-      const res = await fetch(`http://localhost:8000/interview/${candidateId}/finalize`, {
+      const res = await fetch(`${API_BASE_URL}/interview/${candidateId}/finalize`, {
         method: 'POST'
       });
       const data = await res.json();

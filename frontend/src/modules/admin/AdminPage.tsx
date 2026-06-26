@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UploadCloud, CheckCircle, AlertCircle, Trash2, Download } from 'lucide-react';
+import { API_BASE_URL } from '../../config';
 import './AdminPage.css';
 
 export const AdminPage: React.FC = () => {
@@ -10,10 +11,10 @@ export const AdminPage: React.FC = () => {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('http://localhost:8000/admin/voice/file', { method: 'HEAD' })
+    fetch(`${API_BASE_URL}/admin/voice/file`, { method: 'HEAD' })
       .then(res => {
         if (res.ok) {
-          setAudioUrl(`http://localhost:8000/admin/voice/file?t=${Date.now()}`);
+          setAudioUrl(`${API_BASE_URL}/admin/voice/file?t=${Date.now()}`);
         }
       })
       .catch(console.error);
@@ -38,7 +39,7 @@ export const AdminPage: React.FC = () => {
     formData.append('file', file);
     
     try {
-      const response = await fetch('http://localhost:8000/admin/voice/clone', {
+      const response = await fetch(`${API_BASE_URL}/admin/voice/clone`, {
         method: 'POST',
         body: formData,
       });
@@ -46,7 +47,7 @@ export const AdminPage: React.FC = () => {
       if (response.ok) {
         setStatus('Voice cloned successfully! You can now use it in interviews.');
         setStatusType('success');
-        setAudioUrl(`http://localhost:8000/admin/voice/file?t=${Date.now()}`);
+        setAudioUrl(`${API_BASE_URL}/admin/voice/file?t=${Date.now()}`);
       } else {
         setStatus('Failed to clone voice.');
         setStatusType('error');
@@ -63,7 +64,7 @@ export const AdminPage: React.FC = () => {
   const handleDeleteVoice = async () => {
     if (!window.confirm('Are you sure you want to delete the cloned voice?')) return;
     try {
-      const response = await fetch('http://localhost:8000/admin/voice/file', {
+      const response = await fetch(`${API_BASE_URL}/admin/voice/file`, {
         method: 'DELETE',
       });
       if (response.ok) {
